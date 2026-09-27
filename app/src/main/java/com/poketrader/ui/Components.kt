@@ -46,6 +46,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
+import coil.network.HttpException
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -109,6 +115,7 @@ object Fmt {
 @Composable
 fun CardImage(url: String?, modifier: Modifier = Modifier, enlargeUrl: String? = null, placeholder: String? = null) {
     var enlarged by remember { mutableStateOf(false) }
+    var failed by remember(url) { mutableStateOf(false) }
     Box(
         modifier
             .aspectRatio(63f / 88f)
@@ -117,16 +124,59 @@ fun CardImage(url: String?, modifier: Modifier = Modifier, enlargeUrl: String? =
             .then(if (enlargeUrl != null) Modifier.clickable(onClickLabel = "Enlarge card") { enlarged = true } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        if (url == null) {
-            // Some cards (mostly new Japanese ones) have no picture in the database yet.
+        // No picture in the database (mostly new Japanese cards), or it couldn't be loaded (yet).
+        if (url == null || failed) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(6.dp)) {
                 Text("🃏", fontSize = 28.sp)
                 if (placeholder != null) Text(placeholder, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
             }
         }
-        else AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        if (url != null) RetryingImage(url, Modifier.fillMaxSize()) { failed = it }
     }
     if (enlarged && enlargeUrl != null) CardImageDialog(url, enlargeUrl) { enlarged = false }
+}
+
+private data class ImageFailure(val missing: Boolean, val atReconnect: Int)
+
+/** Pauses between retries of a failed picture; the last one repeats while the picture is on screen. */
+private val RETRY_DELAYS_MS = longArrayOf(1_500, 3_000, 6_000, 12_000, 30_000, 60_000)
+
+/**
+ * Loads a picture and keeps trying if that fails: after a growing pause, and at once when the phone
+ * reconnects (a failed load isn't retried by the image loader on its own, so a short network drop
+ * used to leave cards blank). A picture that doesn't exist on the server (HTTP 404) isn't retried.
+ */
+@Composable
+fun RetryingImage(
+    url: String,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    onFailedChange: (Boolean) -> Unit = {},
+) {
+    val reconnects by LocalContext.current.container.network.reconnects.collectAsStateWithLifecycle()
+    var attempt by remember(url) { mutableIntStateOf(0) }
+    var failure by remember(url) { mutableStateOf<ImageFailure?>(null) }
+    LaunchedEffect(failure, reconnects) {
+        val f = failure ?: return@LaunchedEffect
+        if (f.missing) return@LaunchedEffect
+        if (reconnects == f.atReconnect) delay(RETRY_DELAYS_MS[minOf(attempt, RETRY_DELAYS_MS.lastIndex)])
+        failure = null
+        attempt++
+    }
+    key(url, attempt) {
+        AsyncImage(
+            model = url,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = modifier,
+            onSuccess = { onFailedChange(false) },
+            onError = { state ->
+                val missing = (state.result.throwable as? HttpException)?.response?.code == 404
+                failure = ImageFailure(missing, reconnects)
+                onFailedChange(true)
+            },
+        )
+    }
 }
 
 /** Full-screen card image. Pinch or double-tap to zoom, drag to pan, tap to close. */
@@ -177,7 +227,7 @@ fun CardImageDialog(smallUrl: String?, largeUrl: String, onDismiss: () -> Unit) 
             ) {
                 // The small picture is usually cached, so it shows at once while the sharp one loads.
                 if (smallUrl != null) AsyncImage(model = smallUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                AsyncImage(model = largeUrl, contentDescription = "Card image", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                RetryingImage(largeUrl, Modifier.fillMaxSize(), contentDescription = "Card image")
             }
             IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 Icon(Icons.Default.Close, "Close", tint = Color.White)
@@ -224,7 +274,7 @@ fun CardTile(
 ) {
     Column(modifier.clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
-            CardImage(card.thumbUrl, Modifier.fillMaxWidth())
+            CardImage(card.thumbUrl, Modifier.fillMaxWidth(), placeholder = card.name + "\n#" + card.numberLabel)
             if (quantity > 1) {
                 Text(
                     "×$quantity",
@@ -400,7 +450,7 @@ fun CardDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CardImage(selected.thumbUrl, Modifier.width(110.dp), enlargeUrl = selected.largeUrl)
+                    CardImage(selected.thumbUrl, Modifier.width(110.dp), enlargeUrl = selected.largeUrl, placeholder = "#" + selected.numberLabel)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(selected.setName, style = MaterialTheme.typography.bodyMedium)

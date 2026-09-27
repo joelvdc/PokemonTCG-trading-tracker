@@ -4,7 +4,9 @@ import android.app.Application
 import android.content.Context
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import coil.util.DebugLogger
 import com.poketrader.data.AppDatabase
+import com.poketrader.data.NetworkMonitor
 import com.poketrader.data.PriceGuideRepository
 import com.poketrader.data.Repository
 import com.poketrader.data.SetCatalog
@@ -28,6 +30,7 @@ class PokeApp : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
         .okHttpClient { container.http }
         .crossfade(true)
+        .apply { if (BuildConfig.DEBUG) logger(DebugLogger()) }
         .build()
 }
 
@@ -45,6 +48,7 @@ class AppContainer(context: Context) {
     val settings = Settings(context)
     val tcgdex = TcgdexApi(http)
     val sets = SetCatalog(context, tcgdex)
+    val network = NetworkMonitor(context)
     val prices = PriceGuideRepository(context, http, db, settings)
     val repo = Repository(db, tcgdex, prices)
 }
