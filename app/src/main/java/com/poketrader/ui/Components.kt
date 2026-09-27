@@ -202,6 +202,7 @@ fun Tag(text: String, color: Color = MaterialTheme.colorScheme.secondaryContaine
 
 /** Short badge for non-plain variants ("Reverse", "Holo", "1st Ed"); null for plain cards. */
 fun variantBadge(card: CardRef): String? = when {
+    card.oversized -> "Jumbo"
     card.firstEdition -> "1st Ed"
     card.variantLabel.startsWith("Reverse") -> "Reverse"
     card.variantLabel.startsWith("Holo") -> "Holo"
@@ -405,6 +406,7 @@ fun CardDialog(
                         Text(selected.setName, style = MaterialTheme.typography.bodyMedium)
                         Text("#${selected.numberLabel} · ${selected.rarity}", style = MaterialTheme.typography.bodySmall)
                         if (selected.isJapanese) Text("Japanese print", style = MaterialTheme.typography.bodySmall)
+                        if (selected.oversized) Text("Oversized (jumbo) card", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                         Text(
                             Fmt.money(pricesOf(selected, data?.prices?.get(selected.cardmarketId)).best(priceType)),
                             style = MaterialTheme.typography.headlineSmall,

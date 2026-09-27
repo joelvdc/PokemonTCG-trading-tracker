@@ -106,6 +106,8 @@ data class ScannedEntry(
     val language: String,
     val result: AddResult,
     val unitPrice: Double?,
+    /** The card also exists as a jumbo print — the camera can't tell the size, so offer the switch. */
+    val hasJumbo: Boolean = false,
 )
 
 /**
@@ -185,11 +187,12 @@ class ScanController(
     }
 
     suspend fun add(card: TcgCard, dataLang: String, language: String?) {
+        val printings = card.printings(dataLang)
         val ref = card.defaultPrinting(dataLang, holo)
         val lang = language ?: if (dataLang == "ja") "JA" else "EN"
         val result = c.repo.add(target, ref, lang) ?: return
         val price = c.repo.snapshot(ref).best(PriceType.TREND) ?: ref.fallbackPrice
-        added.add(0, ScannedEntry(ref, lang, result, price))
+        added.add(0, ScannedEntry(ref, lang, result, price, hasJumbo = printings.any { it.oversized }))
         status = "Added ${card.name}!"
         onAdded()
     }
@@ -317,6 +320,14 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                     Column(Modifier.width(88.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.clickable { editing = e }) { CardImage(e.card.thumbUrl, Modifier.fillMaxWidth()) }
                         Text(Fmt.money(e.unitPrice), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        if (e.hasJumbo && !e.card.oversized) {
+                            Text(
+                                "Big card? Tap it",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { editing = e },
+                            )
+                        }
                         IconButton(onClick = { controller.undo(e) }) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
                     }
                 }

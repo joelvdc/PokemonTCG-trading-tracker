@@ -22,6 +22,9 @@ asked). It's built for 64-bit ARM phones (practically every phone from the last 
 - 1st Edition and Shadowless vintage cards share one Cardmarket product, so 1st Edition can be under-priced — the app
   warns and offers an "agreed price".
 - Many recent Japanese cards have no picture in TCGdex yet; they show name + number instead.
+- Oversized (jumbo) cards are a version of the normal card ("Jumbo · Holo"), with their own Cardmarket price. The
+  camera can't tell size, so a scanned card is added as standard size with a "Big card? Tap it" hint when a jumbo
+  version exists. Jumbo cards TCGdex doesn't list can't be added.
 - The scanner identifies cards mainly by the printed number ("025/165") plus the name. Holo vs reverse holo can't be
   seen by the camera: use the "✨ Shiny" toggle or tap a scanned card to change its version.
 

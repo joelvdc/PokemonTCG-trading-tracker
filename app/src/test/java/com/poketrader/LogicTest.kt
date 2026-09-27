@@ -176,8 +176,9 @@ class VariantTest {
     fun printingsNamesAndPriceColumns() {
         val card = json.decodeFromString<TcgCard>(pikachu)
         val p = card.printings("ja")
-        assertEquals(listOf("Normal", "Reverse Holo · Poké Ball", "Reverse Holo · Master Ball"), p.map { it.variantLabel })
-        assertEquals(listOf(false, true, true), p.map { it.holoPrice })
+        assertEquals(listOf("Normal", "Reverse Holo · Poké Ball", "Reverse Holo · Master Ball", "Jumbo"), p.map { it.variantLabel })
+        assertEquals(listOf(false, true, true, false), p.map { it.holoPrice })
+        assertEquals(listOf(false, false, false, true), p.map { it.oversized })
         assertEquals(837272, p[2].cardmarketId)
         assertEquals(457.27, p[2].fallbackPrice!!, 1e-9)
         assertEquals(0.12, p[0].fallbackPrice!!, 1e-9)
@@ -195,6 +196,25 @@ class VariantTest {
         val pika = json.decodeFromString<TcgCard>(pikachu)
         assertEquals("n1", pika.defaultPrinting("ja", preferHolo = false).variantId)
         assertEquals("r1", pika.defaultPrinting("ja", preferHolo = true).variantId)
+    }
+
+    @Test
+    fun jumboCardsAreListedLastAndNeverPickedByDefault() {
+        // Shape of api.tcgdex.net/v2/en/cards/svp-004 (Mimikyu ex promo, also printed jumbo).
+        val mimikyu = json.decodeFromString<TcgCard>(
+            """{"id":"svp-004","localId":"004","name":"Mimikyu ex","set":{"id":"svp","name":"SVP Black Star Promos"},
+               "variants_detailed":[
+                {"type":"holo","size":"jumbo","variantId":"j","thirdParty":{"cardmarket":701131}},
+                {"type":"holo","size":"standard","variantId":"s","thirdParty":{"cardmarket":700000}}
+               ]}"""
+        )
+        val p = mimikyu.printings("en")
+        assertEquals(listOf("Holo", "Jumbo · Holo"), p.map { it.variantLabel })
+        assertEquals(701131, p[1].cardmarketId)
+        assertEquals("s", mimikyu.defaultPrinting("en", preferHolo = false).variantId)
+        assertEquals("s", mimikyu.defaultPrinting("en", preferHolo = true).variantId)
+        assertEquals("Jumbo", com.poketrader.ui.variantBadge(p[1]))
+        assertEquals("Holo", com.poketrader.ui.variantBadge(p[0]))
     }
 
     @Test

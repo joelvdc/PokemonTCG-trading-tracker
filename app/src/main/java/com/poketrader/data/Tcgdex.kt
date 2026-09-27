@@ -72,7 +72,10 @@ data class TcgVariant(
     val variantId: String = "",
     val thirdParty: TcgThirdParty? = null,
     val pricing: TcgPricing? = null,
-)
+) {
+    /** Jumbo / oversized print (TCGdex "size" other than "standard"). */
+    val isOversized get() = size != null && size != "standard"
+}
 
 @Serializable
 data class TcgVariantFlags(
@@ -102,9 +105,12 @@ data class TcgCard(
     val variants: TcgVariantFlags? = null,
     @SerialName("variants_detailed") val variantsDetailed: List<TcgVariant>? = null,
 ) {
-    /** Every standard-size variant of this card as a [CardRef], most common first. */
+    /**
+     * Every variant of this card as a [CardRef]: standard-size ones first (most common first),
+     * then oversized (jumbo) prints, which Cardmarket sells and prices as separate products.
+     */
     fun printings(dataLang: String): List<CardRef> {
-        val detailed = variantsDetailed.orEmpty().filter { it.size == null || it.size == "standard" }
+        val detailed = variantsDetailed.orEmpty().sortedBy { it.isOversized }
         val variants = detailed.ifEmpty {
             val f = variants ?: TcgVariantFlags(normal = true)
             buildList {
@@ -140,7 +146,8 @@ data class TcgCard(
     /** The variant to use when none was chosen: plain first, or the first reverse holo if [preferHolo]. */
     fun defaultPrinting(dataLang: String, preferHolo: Boolean): CardRef {
         val all = printings(dataLang)
-        val plain = all.filter { !it.firstEdition }
+        // Never guess a 1st Edition or an oversized card: those must be picked on purpose.
+        val plain = all.filter { !it.firstEdition && !it.oversized }
         return if (preferHolo) {
             plain.firstOrNull { it.holoPrice } ?: plain.firstOrNull { it.variantLabel.startsWith("Holo") } ?: all.first()
         } else {
@@ -152,16 +159,21 @@ data class TcgCard(
 private fun titleCase(s: String) = s.split('-', '_', ' ').filter { it.isNotEmpty() }
     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
-/** Human-readable name for a variant, e.g. "Reverse Holo · Master Ball" or "Holo · Shadowless · 1st Edition". */
+/**
+ * Human-readable name for a variant, e.g. "Reverse Holo · Master Ball", "Holo · Shadowless · 1st Edition"
+ * or "Jumbo". Oversized labels always start with [CardRef.OVERSIZED_LABELS].
+ */
 fun variantLabel(v: TcgVariant): String {
-    val parts = mutableListOf(
-        when (v.type) {
-            "reverse" -> "Reverse Holo"
-            "holo" -> "Holo"
-            "normal" -> "Normal"
-            else -> titleCase(v.type)
-        }
-    )
+    val parts = mutableListOf<String>()
+    if (v.isOversized) parts += if (v.size == "jumbo") "Jumbo" else "Oversized (${titleCase(v.size ?: "")})"
+    val finish = when (v.type) {
+        "reverse" -> "Reverse Holo"
+        "holo" -> "Holo"
+        "normal" -> "Normal"
+        else -> titleCase(v.type)
+    }
+    // "Jumbo" alone reads better than "Jumbo · Normal".
+    if (!(v.isOversized && v.type == "normal")) parts += finish
     v.foil?.let {
         parts += when (it) {
             "pokeball" -> "Poké Ball"

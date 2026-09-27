@@ -103,10 +103,17 @@ data class CardRef(
     val fallbackPrice: Double?,
     val firstEdition: Boolean,
 ) {
+    /** Jumbo / oversized print; derived from the label so no extra database column is needed. */
+    val oversized get() = OVERSIZED_LABELS.any { variantLabel.startsWith(it) }
+
     val thumbUrl get() = imageBase?.let { "$it/low.webp" }
     val largeUrl get() = imageBase?.let { "$it/high.webp" }
     val numberLabel get() = setOfficial?.let { "$localId/$it" } ?: localId
     val isJapanese get() = dataLang == "ja"
+
+    companion object {
+        val OVERSIZED_LABELS = listOf("Jumbo", "Oversized")
+    }
 }
 
 @Entity(
