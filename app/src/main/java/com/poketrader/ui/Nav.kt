@@ -61,6 +61,8 @@ fun AppNav() {
         c.appScope.launch { c.prices.refreshIfStale() }
         // Warm up the set lists the scanner needs.
         c.appScope.launch { runCatching { c.sets.sets("en"); c.sets.sets("ja") } }
+        // Pictures for international cards TCGdex has none for.
+        c.appScope.launch { runCatching { c.fallbackImages.load() } }
     }
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route

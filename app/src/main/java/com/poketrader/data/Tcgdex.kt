@@ -24,7 +24,7 @@ data class TcgBrief(
 ) {
     /** Card ids are "<setId>-<localId>"; set ids may themselves contain dashes. */
     val setId get() = id.substringBeforeLast('-')
-    val thumbUrl get() = image?.let { "$it/low.webp" }
+    fun thumbUrl(dataLang: String) = FallbackImages.thumb(FallbackImages.base(image, dataLang, setId, localId))
 }
 
 @Serializable

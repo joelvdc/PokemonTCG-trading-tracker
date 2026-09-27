@@ -50,6 +50,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +60,7 @@ import com.poketrader.AppContainer
 import com.poketrader.container
 import com.poketrader.data.CardRef
 import com.poketrader.data.CardTarget
+import com.poketrader.data.NumberFilter
 import com.poketrader.data.Side
 import com.poketrader.data.TcgBrief
 import com.poketrader.scan.CardTextParser
@@ -71,16 +73,28 @@ fun targetLabel(t: CardTarget) = when (t) {
     else -> "Choose the right card"
 }
 
-/** A search result with its set's name, ready to show. */
-data class Hit(val brief: TcgBrief, val setName: String, val dataLang: String)
+/** A search result with its set's name and printed size, ready to show. */
+data class Hit(
+    val brief: TcgBrief,
+    val setName: String,
+    val dataLang: String,
+    val setOfficial: Int? = null,
+    val setTotal: Int? = null,
+) {
+    /** "86/110" like on the card, or just "86" when the set size is unknown. */
+    val numberLabel get() = setOfficial?.takeIf { it > 0 }?.let { "${brief.localId}/$it" } ?: brief.localId
+}
 
 /** Briefs → hits: no Pokémon TCG Pocket (digital) cards; cards with a picture first, then newest sets first. */
 suspend fun toHits(c: AppContainer, briefs: List<TcgBrief>, dataLang: String): List<Hit> {
     c.sets.sets(dataLang)
     val paper = briefs.filter { !c.sets.isDigital(dataLang, it.setId) }
     val order = paper.associateWith { c.sets.order(dataLang, it.setId).let { o -> if (o == Int.MAX_VALUE) -1 else o } }
-    return paper.sortedWith(compareBy<TcgBrief>({ it.image == null }, { -(order[it] ?: 0) }))
-        .map { b -> Hit(b, c.sets.find(dataLang, b.setId)?.name ?: b.setId, dataLang) }
+    return paper.sortedWith(compareBy<TcgBrief>({ it.thumbUrl(dataLang) == null }, { -(order[it] ?: 0) }))
+        .map { b ->
+            val set = c.sets.find(dataLang, b.setId)
+            Hit(b, set?.name ?: b.setId, dataLang, set?.cardCount?.official, set?.cardCount?.total)
+        }
 }
 
 @Composable
@@ -92,6 +106,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
 
     var query by rememberSaveable { mutableStateOf(initialQuery ?: "") }
     var selectedName by rememberSaveable { mutableStateOf(initialQuery) }
+    var numberText by rememberSaveable { mutableStateOf("") }
     var japanese by rememberSaveable { mutableStateOf(initialQuery?.let { CardTextParser.containsJapanese(it) } ?: false) }
     var suggestions by remember { mutableStateOf(emptyList<String>()) }
     var hits by remember { mutableStateOf<List<Hit>?>(null) }
@@ -184,7 +199,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
         Column(Modifier.padding(pad).imePadding()) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it; selectedName = null },
+                onValueChange = { query = it; selectedName = null; numberText = "" },
                 placeholder = { Text("Pokémon or card name") },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
@@ -201,10 +216,28 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                     FilterChip(selected = japanese, onClick = { japanese = true }, label = { Text("🇯🇵 Japanese") })
                 }
             }
+            if (selectedName != null) {
+                // The number printed at the bottom of the card, e.g. "86/110": quickest way to find one card.
+                OutlinedTextField(
+                    value = numberText,
+                    onValueChange = { numberText = it },
+                    label = { Text("Card number") },
+                    placeholder = { Text("e.g. 86 or 86/110") },
+                    leadingIcon = { Text("#", style = MaterialTheme.typography.titleMedium) },
+                    trailingIcon = {
+                        if (numberText.isNotEmpty()) IconButton(onClick = { numberText = "" }) { Icon(Icons.Default.Clear, "Clear number") }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+            }
             message?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
-            val h = hits
+            val all = hits
+            val filter = NumberFilter.parse(numberText)
+            val h = if (all == null || filter.isEmpty) all else all.filter { filter.matches(it.brief.localId, it.setOfficial, it.setTotal) }
             when {
                 selectedName == null -> LazyColumn {
                     items(suggestions) { name ->
@@ -216,14 +249,17 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                     }
                 }
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                h != null && h.isEmpty() && message == null -> EmptyState("🔍", "No cards found", "Try another spelling.")
+                h != null && h.isEmpty() && message == null ->
+                    if (all.isNullOrEmpty()) EmptyState("🔍", "No cards found", "Try another spelling.")
+                    else EmptyState("🔍", "No card with number $numberText", "Check the number at the bottom of the card, or try the other tab.")
                 h != null -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(110.dp),
                     contentPadding = PaddingValues(8.dp),
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            "${h.size} card(s) — tap the one you have",
+                            if (filter.isEmpty) "${h.size} card(s) — tap the one you have"
+                            else "${h.size} of ${all?.size ?: h.size} card(s) with number $numberText",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(4.dp),
@@ -231,7 +267,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                     }
                     items(h, key = { it.dataLang + it.brief.id }) { hit ->
                         Column(Modifier.clickable { open(hit) }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            CardImage(hit.brief.thumbUrl, Modifier.fillMaxWidth(), placeholder = hit.brief.name + "\n#" + hit.brief.localId)
+                            CardImage(hit.brief.thumbUrl(hit.dataLang), Modifier.fillMaxWidth(), placeholder = hit.brief.name + "\n#" + hit.numberLabel)
                             Text(
                                 hit.setName,
                                 style = MaterialTheme.typography.labelSmall,
@@ -239,7 +275,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                                 overflow = TextOverflow.Ellipsis,
                                 textAlign = TextAlign.Center,
                             )
-                            Text("#${hit.brief.localId}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("#${hit.numberLabel}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

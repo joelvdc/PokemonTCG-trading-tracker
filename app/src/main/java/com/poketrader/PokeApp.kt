@@ -6,6 +6,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.util.DebugLogger
 import com.poketrader.data.AppDatabase
+import com.poketrader.data.FallbackImageSets
 import com.poketrader.data.NetworkMonitor
 import com.poketrader.data.PriceGuideRepository
 import com.poketrader.data.Repository
@@ -48,6 +49,7 @@ class AppContainer(context: Context) {
     val settings = Settings(context)
     val tcgdex = TcgdexApi(http)
     val sets = SetCatalog(context, tcgdex)
+    val fallbackImages = FallbackImageSets(context, http, sets)
     val network = NetworkMonitor(context)
     val prices = PriceGuideRepository(context, http, db, settings)
     val repo = Repository(db, tcgdex, prices)

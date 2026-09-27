@@ -116,6 +116,7 @@ object Fmt {
 fun CardImage(url: String?, modifier: Modifier = Modifier, enlargeUrl: String? = null, placeholder: String? = null) {
     var enlarged by remember { mutableStateOf(false) }
     var failed by remember(url) { mutableStateOf(false) }
+    var missing by remember(url) { mutableStateOf(false) }
     Box(
         modifier
             .aspectRatio(63f / 88f)
@@ -124,14 +125,21 @@ fun CardImage(url: String?, modifier: Modifier = Modifier, enlargeUrl: String? =
             .then(if (enlargeUrl != null) Modifier.clickable(onClickLabel = "Enlarge card") { enlarged = true } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        // No picture in the database (mostly new Japanese cards), or it couldn't be loaded (yet).
+        // No picture anywhere (most Japanese cards, some promos), or it couldn't be loaded (yet).
         if (url == null || failed) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(6.dp)) {
                 Text("🃏", fontSize = 28.sp)
                 if (placeholder != null) Text(placeholder, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                if (placeholder != null) {
+                    Text(
+                        if (url == null || missing) "no picture" else "loading…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-        if (url != null) RetryingImage(url, Modifier.fillMaxSize()) { failed = it }
+        if (url != null) RetryingImage(url, Modifier.fillMaxSize(), onMissing = { missing = true }) { failed = it }
     }
     if (enlarged && enlargeUrl != null) CardImageDialog(url, enlargeUrl) { enlarged = false }
 }
@@ -151,6 +159,7 @@ fun RetryingImage(
     url: String,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
+    onMissing: () -> Unit = {},
     onFailedChange: (Boolean) -> Unit = {},
 ) {
     val reconnects by LocalContext.current.container.network.reconnects.collectAsStateWithLifecycle()
@@ -172,6 +181,7 @@ fun RetryingImage(
             onSuccess = { onFailedChange(false) },
             onError = { state ->
                 val missing = (state.result.throwable as? HttpException)?.response?.code == 404
+                if (missing) onMissing()
                 failure = ImageFailure(missing, reconnects)
                 onFailedChange(true)
             },

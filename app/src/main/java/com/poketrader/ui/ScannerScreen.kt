@@ -343,7 +343,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                 LazyVerticalGrid(columns = GridCells.Adaptive(96.dp), modifier = Modifier.heightIn(max = 480.dp)) {
                     items(ch.candidates, key = { it.brief.id }) { cand ->
                         Column(Modifier.clickable { controller.pick(cand.brief.id) }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            CardImage(cand.brief.thumbUrl, Modifier.fillMaxWidth(), placeholder = cand.brief.name + "\n#" + cand.brief.localId)
+                            CardImage(cand.brief.thumbUrl(ch.dataLang), Modifier.fillMaxWidth(), placeholder = cand.brief.name + "\n#" + cand.brief.localId)
                             Text(cand.setName, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis)
                             Text("#${cand.brief.localId}", style = MaterialTheme.typography.labelSmall)
                         }

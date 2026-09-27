@@ -106,8 +106,9 @@ data class CardRef(
     /** Jumbo / oversized print; derived from the label so no extra database column is needed. */
     val oversized get() = OVERSIZED_LABELS.any { variantLabel.startsWith(it) }
 
-    val thumbUrl get() = imageBase?.let { "$it/low.webp" }
-    val largeUrl get() = imageBase?.let { "$it/high.webp" }
+    /** Picture URLs: TCGdex's, or pokemontcg.io's when TCGdex has none (see [FallbackImages]). */
+    val thumbUrl get() = FallbackImages.thumb(FallbackImages.base(imageBase, dataLang, setId, localId))
+    val largeUrl get() = FallbackImages.large(FallbackImages.base(imageBase, dataLang, setId, localId))
     val numberLabel get() = setOfficial?.let { "$localId/$it" } ?: localId
     val isJapanese get() = dataLang == "ja"
 

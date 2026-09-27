@@ -21,7 +21,10 @@ asked). It's built for 64-bit ARM phones (practically every phone from the last 
 ## Known limits
 - 1st Edition and Shadowless vintage cards share one Cardmarket product, so 1st Edition can be under-priced — the app
   warns and offers an "agreed price".
-- Many recent Japanese cards have no picture in TCGdex yet; they show name + number instead.
+- Card pictures come from TCGdex. For international cards TCGdex has no picture for (some promos and special
+  collections), the app falls back to pokemontcg.io's image server, matching sets via pokemontcg.io's set list on
+  GitHub. There is no open source for missing Japanese pictures (about 90% of Japanese cards in TCGdex have none);
+  those show name + number + "no picture". Search results can be filtered by card number ("86", "86/110", "TG05").
 - Oversized (jumbo) cards are a version of the normal card ("Jumbo · Holo"), with their own Cardmarket price. The
   camera can't tell size, so a scanned card is added as standard size with a "Big card? Tap it" hint when a jumbo
   version exists. Jumbo cards TCGdex doesn't list can't be added.

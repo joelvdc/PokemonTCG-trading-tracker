@@ -2,6 +2,8 @@ package com.poketrader
 
 import com.poketrader.data.Balance
 import com.poketrader.data.CardLinks
+import com.poketrader.data.FallbackImages
+import com.poketrader.data.NumberFilter
 import com.poketrader.data.PriceEntity
 import com.poketrader.data.PriceSet
 import com.poketrader.data.PriceType
@@ -262,5 +264,64 @@ class BalanceTest {
         assertEquals(Verdict.FAIR, Balance.of(listOf(item(Side.GIVE, 10.0), item(Side.GET, 10.4)), PriceType.TREND, 5).verdict)
         assertEquals(Verdict.FAVORS_THEM, Balance.of(listOf(item(Side.GIVE, 10.0, 2), item(Side.GET, 12.0)), PriceType.TREND, 5).verdict)
         assertEquals(Verdict.FAVORS_YOU, Balance.of(listOf(item(Side.GIVE, 1.0), item(Side.GET, 5.0, custom = 9.0)), PriceType.TREND, 5).verdict)
+    }
+}
+
+class NumberFilterTest {
+    @Test
+    fun numberFormsAKidMightType() {
+        for (input in listOf("86", "#86", "086", " 86 ", "86/110", "#86/110")) {
+            assertTrue(input, NumberFilter.parse(input).matches("86", 110, 112))
+        }
+        assertFalse(NumberFilter.parse("86").matches("8", 110, 110))
+        assertFalse(NumberFilter.parse("86/111").matches("86", 110, 112))
+        assertTrue(NumberFilter.parse("86/112").matches("86", 110, 112)) // secret-rare total counts too
+        assertTrue(NumberFilter.parse("/110").matches("3", 110, null))
+        assertTrue(NumberFilter.parse("").isEmpty)
+    }
+
+    @Test
+    fun galleryAndPromoNumbers() {
+        assertTrue(NumberFilter.parse("tg5").matches("TG05", 30, 30))
+        assertTrue(NumberFilter.parse("TG05/TG30").matches("TG05", 30, 30))
+        assertTrue(NumberFilter.parse("swsh39").matches("SWSH039", null, null))
+        assertTrue(NumberFilter.parse("025").matches("25", 165, 207)) // Japanese ids are zero-padded
+    }
+}
+
+class FallbackImagesTest {
+    private fun t(id: String, name: String, official: Int?, total: Int? = official) =
+        com.poketrader.data.TcgSetBrief(id, name, cardCount = com.poketrader.data.TcgCount(official, total))
+    private fun p(id: String, name: String, printed: Int?) = com.poketrader.data.PtcgSet(id, name, printed, printed)
+
+    @Test
+    fun matchesSetsByNameCodeAndCount() {
+        val m = FallbackImages.match(
+            listOf(
+                t("sm7.5", "Dragon Majesty", 70), t("sv03.5", "151", 165, 207), t("base1", "Base Set", 102),
+                t("hgss2", "Unleashed", 95), t("smp", "SM Black Star Promos", 250), t("mcd24", "McDonald's Collection 2024", 15),
+            ),
+            listOf(
+                p("sm75", "Dragon Majesty", 70), p("sv3pt5", "151", 165), p("base1", "Base", 102),
+                p("hgss2", "HS—Unleashed", 95), p("smp", "SM Black Star Promos", 248),
+            ),
+        )
+        assertEquals("sm75", m["sm7.5"])
+        assertEquals("sv3pt5", m["sv03.5"])
+        assertEquals("base1", m["base1"])
+        assertEquals("hgss2", m["hgss2"])
+        assertEquals("smp", m["smp"])
+        assertNull(m["mcd24"])
+    }
+
+    @Test
+    fun buildsPictureUrls() {
+        FallbackImages.setIds = mapOf("sm7.5" to "sm75", "swsh11tg" to "swsh11tg")
+        assertEquals("https://images.pokemontcg.io/sm75/3.png", FallbackImages.thumb(FallbackImages.base(null, "en", "sm7.5", "003")))
+        assertEquals("https://images.pokemontcg.io/swsh11tg/TG03_hires.png", FallbackImages.large(FallbackImages.base(null, "en", "swsh11tg", "TG03")))
+        // TCGdex's own picture wins; Japanese cards have no fallback.
+        assertEquals("https://assets.tcgdex.net/en/x/1/low.webp", FallbackImages.thumb(FallbackImages.base("https://assets.tcgdex.net/en/x/1", "en", "sm7.5", "1")))
+        assertNull(FallbackImages.base(null, "ja", "sm7.5", "3"))
+        FallbackImages.setIds = emptyMap()
     }
 }
