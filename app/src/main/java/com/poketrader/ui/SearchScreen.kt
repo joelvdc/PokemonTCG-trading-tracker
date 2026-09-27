@@ -60,6 +60,7 @@ import com.poketrader.AppContainer
 import com.poketrader.container
 import com.poketrader.data.CardRef
 import com.poketrader.data.CardTarget
+import com.poketrader.data.ImageKey
 import com.poketrader.data.NumberFilter
 import com.poketrader.data.Side
 import com.poketrader.data.TcgBrief
@@ -267,7 +268,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                     }
                     items(h, key = { it.dataLang + it.brief.id }) { hit ->
                         Column(Modifier.clickable { open(hit) }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            CardImage(hit.brief.thumbUrl(hit.dataLang), Modifier.fillMaxWidth(), placeholder = hit.brief.name + "\n#" + hit.numberLabel)
+                            CardImage(hit.brief.thumbUrl(hit.dataLang), Modifier.fillMaxWidth(), fallbackKey = ImageKey(hit.brief.id, hit.dataLang), placeholder = hit.brief.name + "\n#" + hit.numberLabel)
                             Text(
                                 hit.setName,
                                 style = MaterialTheme.typography.labelSmall,

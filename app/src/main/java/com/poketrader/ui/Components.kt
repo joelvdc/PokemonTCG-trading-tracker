@@ -83,6 +83,8 @@ import com.poketrader.data.Balance
 import com.poketrader.data.CONDITIONS
 import com.poketrader.data.CardLinks
 import com.poketrader.data.CardRef
+import com.poketrader.data.ImageKey
+import com.poketrader.data.TcgplayerImages
 import com.poketrader.data.LANGUAGES
 import com.poketrader.data.PriceEntity
 import com.poketrader.data.PriceSet
@@ -113,35 +115,62 @@ object Fmt {
 
 /** A card picture at card proportions. With [enlargeUrl], tapping opens it full-screen. */
 @Composable
-fun CardImage(url: String?, modifier: Modifier = Modifier, enlargeUrl: String? = null, placeholder: String? = null) {
+fun CardImage(
+    url: String?,
+    modifier: Modifier = Modifier,
+    enlargeUrl: String? = null,
+    placeholder: String? = null,
+    /** When [url] is null or doesn't exist, look for a TCGplayer picture of this card instead. */
+    fallbackKey: ImageKey? = null,
+) {
+    val tcgplayer = LocalContext.current.container.tcgplayerImages
     var enlarged by remember { mutableStateOf(false) }
     var failed by remember(url) { mutableStateOf(false) }
     var missing by remember(url) { mutableStateOf(false) }
+    var fallbackMissing by remember(url, fallbackKey) { mutableStateOf(false) }
+    val needsFallback = fallbackKey != null && (url == null || missing)
+    // -1 = still looking, 0 = TCGplayer has no picture either.
+    val productId by produceState(-1, needsFallback, fallbackKey) {
+        value = if (needsFallback && fallbackKey != null) tcgplayer.productId(fallbackKey) ?: 0 else 0
+    }
+    val usingFallback = url == null || missing
+    val shown = if (!usingFallback) url else productId.takeIf { it > 0 && !fallbackMissing }?.let(TcgplayerImages::thumb)
+    val shownLarge = if (!usingFallback) enlargeUrl else productId.takeIf { it > 0 && enlargeUrl != null }?.let(TcgplayerImages::large)
+    val searching = usingFallback && needsFallback && productId == -1
+
     Box(
         modifier
             .aspectRatio(63f / 88f)
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .then(if (enlargeUrl != null) Modifier.clickable(onClickLabel = "Enlarge card") { enlarged = true } else Modifier),
+            .then(if (shownLarge != null) Modifier.clickable(onClickLabel = "Enlarge card") { enlarged = true } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        // No picture anywhere (most Japanese cards, some promos), or it couldn't be loaded (yet).
-        if (url == null || failed) {
+        // No picture anywhere (many Japanese cards), or it couldn't be loaded (yet).
+        if (shown == null || failed) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(6.dp)) {
                 Text("🃏", fontSize = 28.sp)
                 if (placeholder != null) Text(placeholder, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                 if (placeholder != null) {
                     Text(
-                        if (url == null || missing) "no picture" else "loading…",
+                        if (shown == null && !searching) "no picture" else "loading…",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
-        if (url != null) RetryingImage(url, Modifier.fillMaxSize(), onMissing = { missing = true }) { failed = it }
+        if (shown != null) {
+            key(shown) {
+                RetryingImage(
+                    shown,
+                    Modifier.fillMaxSize(),
+                    onMissing = { if (usingFallback) fallbackMissing = true else missing = true },
+                ) { failed = it }
+            }
+        }
     }
-    if (enlarged && enlargeUrl != null) CardImageDialog(url, enlargeUrl) { enlarged = false }
+    if (enlarged && shownLarge != null) CardImageDialog(shown, shownLarge) { enlarged = false }
 }
 
 private data class ImageFailure(val missing: Boolean, val atReconnect: Int)
@@ -284,7 +313,12 @@ fun CardTile(
 ) {
     Column(modifier.clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
-            CardImage(card.thumbUrl, Modifier.fillMaxWidth(), placeholder = card.name + "\n#" + card.numberLabel)
+            CardImage(
+                card.thumbUrl,
+                Modifier.fillMaxWidth(),
+                placeholder = card.name + "\n#" + card.numberLabel,
+                fallbackKey = ImageKey(card.cardId, card.dataLang, card.variantId),
+            )
             if (quantity > 1) {
                 Text(
                     "×$quantity",
@@ -460,7 +494,7 @@ fun CardDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CardImage(selected.thumbUrl, Modifier.width(110.dp), enlargeUrl = selected.largeUrl, placeholder = "#" + selected.numberLabel)
+                    CardImage(selected.thumbUrl, Modifier.width(110.dp), enlargeUrl = selected.largeUrl, placeholder = "#" + selected.numberLabel, fallbackKey = ImageKey(selected.cardId, selected.dataLang, selected.variantId))
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(selected.setName, style = MaterialTheme.typography.bodyMedium)

@@ -60,7 +60,7 @@ data class TcgCardmarketPricing(
 data class TcgPricing(val cardmarket: TcgCardmarketPricing? = null)
 
 @Serializable
-data class TcgThirdParty(val cardmarket: Int? = null)
+data class TcgThirdParty(val cardmarket: Int? = null, val tcgplayer: Int? = null)
 
 @Serializable
 data class TcgVariant(

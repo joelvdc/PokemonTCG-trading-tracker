@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.poketrader.container
 import com.poketrader.data.CardTarget
+import com.poketrader.data.ImageKey
 import com.poketrader.data.PriceType
 import com.poketrader.data.Side
 import com.poketrader.data.TradeItem
@@ -185,9 +186,9 @@ private fun TradeCard(t: TradeWithItems, priceType: PriceType, tolerance: Int, o
             if (t.items.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    t.get.take(4).forEach { CardImage(it.card.thumbUrl, Modifier.width(40.dp)) }
+                    t.get.take(4).forEach { CardImage(it.card.thumbUrl, Modifier.width(40.dp), fallbackKey = ImageKey(it.card.cardId, it.card.dataLang, it.card.variantId)) }
                     if (t.get.isNotEmpty() && t.give.isNotEmpty()) Text("  ⇄  ", style = MaterialTheme.typography.titleMedium)
-                    t.give.take(4).forEach { CardImage(it.card.thumbUrl, Modifier.width(40.dp)) }
+                    t.give.take(4).forEach { CardImage(it.card.thumbUrl, Modifier.width(40.dp), fallbackKey = ImageKey(it.card.cardId, it.card.dataLang, it.card.variantId)) }
                 }
             }
         }

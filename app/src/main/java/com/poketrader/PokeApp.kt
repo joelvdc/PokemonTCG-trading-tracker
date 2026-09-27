@@ -13,6 +13,7 @@ import com.poketrader.data.Repository
 import com.poketrader.data.SetCatalog
 import com.poketrader.data.Settings
 import com.poketrader.data.TcgdexApi
+import com.poketrader.data.TcgplayerImages
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,6 +51,7 @@ class AppContainer(context: Context) {
     val tcgdex = TcgdexApi(http)
     val sets = SetCatalog(context, tcgdex)
     val fallbackImages = FallbackImageSets(context, http, sets)
+    val tcgplayerImages = TcgplayerImages(context, tcgdex)
     val network = NetworkMonitor(context)
     val prices = PriceGuideRepository(context, http, db, settings)
     val repo = Repository(db, tcgdex, prices)

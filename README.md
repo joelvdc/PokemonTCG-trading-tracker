@@ -4,9 +4,9 @@ A kid-friendly app for trading Pokémon cards: scan or search the cards on each 
 trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up to date when the trade is done.
 
 ## Install
-Copy `PokeTrader-1.2.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.3.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.2-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.3-universal.apk` instead (bigger, runs on any device).
 
 ## Where the data comes from (no app updates needed for new sets)
 - **Cards, pictures, names in all languages:** [TCGdex](https://tcgdex.net) (free, open API), looked up live.
@@ -23,8 +23,9 @@ asked). It's built for 64-bit ARM phones (practically every phone from the last 
   warns and offers an "agreed price".
 - Card pictures come from TCGdex. For international cards TCGdex has no picture for (some promos and special
   collections), the app falls back to pokemontcg.io's image server, matching sets via pokemontcg.io's set list on
-  GitHub. There is no open source for missing Japanese pictures (about 90% of Japanese cards in TCGdex have none);
-  those show name + number + "no picture". Search results can be filtered by card number ("86", "86/110", "TG05").
+  GitHub. As a last resort it uses TCGplayer's product picture (TCGdex lists a TCGplayer product id for most
+  international and some Japanese cards; the id lookup is cached on the phone). Cards with no picture in any of
+  these (still many Japanese ones) show name + number + "no picture". Search results can be filtered by card number ("86", "86/110", "TG05").
 - Oversized (jumbo) cards are a version of the normal card ("Jumbo · Holo"), with their own Cardmarket price. The
   camera can't tell size, so a scanned card is added as standard size with a "Big card? Tap it" hint when a jumbo
   version exists. Jumbo cards TCGdex doesn't list can't be added.
