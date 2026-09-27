@@ -4,9 +4,9 @@ A kid-friendly app for trading Pokémon cards: scan or search the cards on each 
 trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up to date when the trade is done.
 
 ## Install
-Copy `PokeTrader-1.0.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.1.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.0-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.1-universal.apk` instead (bigger, runs on any device).
 
 ## Where the data comes from (no app updates needed for new sets)
 - **Cards, pictures, names in all languages:** [TCGdex](https://tcgdex.net) (free, open API), looked up live.

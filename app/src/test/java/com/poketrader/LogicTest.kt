@@ -1,6 +1,7 @@
 package com.poketrader
 
 import com.poketrader.data.Balance
+import com.poketrader.data.CardLinks
 import com.poketrader.data.PriceEntity
 import com.poketrader.data.PriceSet
 import com.poketrader.data.PriceType
@@ -202,6 +203,29 @@ class VariantTest {
         assertEquals(3.0, e.toSet(holo = true).trend!!, 1e-9)
         // No normal-copy prices recorded: fall back to the holo column rather than showing nothing.
         assertEquals(3.0, e.toSet(holo = false).trend!!, 1e-9)
+    }
+}
+
+class CardLinksTest {
+    private val card = Json { ignoreUnknownKeys = true }.decodeFromString<TcgCard>(
+        """{"id":"SV2a-025","localId":"025","name":"ピカチュウ","set":{"id":"SV2a"},
+           "variants_detailed":[{"type":"reverse","foil":"masterball","variantId":"r2","thirdParty":{"cardmarket":837272}}]}"""
+    ).printings("ja").first()
+
+    @Test
+    fun linksToTheVariantsProductInThePhonesLanguage() {
+        assertEquals("https://www.cardmarket.com/fr/Pokemon/Products?idProduct=837272", CardLinks.cardmarket(card, java.util.Locale.FRANCE))
+        // Cardmarket has no Japanese site: fall back to English.
+        assertEquals("https://www.cardmarket.com/en/Pokemon/Products?idProduct=837272", CardLinks.cardmarket(card, java.util.Locale.JAPAN))
+    }
+
+    @Test
+    fun searchesByNameWithoutProductId() {
+        val noId = card.copy(cardmarketId = null, name = "Pikachu ex")
+        assertEquals(
+            "https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Pikachu+ex",
+            CardLinks.cardmarket(noId, java.util.Locale.UK),
+        )
     }
 }
 

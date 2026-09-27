@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
@@ -60,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -73,6 +75,7 @@ import coil.compose.AsyncImage
 import com.poketrader.container
 import com.poketrader.data.Balance
 import com.poketrader.data.CONDITIONS
+import com.poketrader.data.CardLinks
 import com.poketrader.data.CardRef
 import com.poketrader.data.LANGUAGES
 import com.poketrader.data.PriceEntity
@@ -467,6 +470,15 @@ fun CardDialog(
                 }
                 HorizontalDivider()
                 PriceTable(pricesOf(selected, data?.prices?.get(selected.cardmarketId)), priceType)
+                val uriHandler = LocalUriHandler.current
+                OutlinedButton(
+                    onClick = { uriHandler.openUri(CardLinks.cardmarket(selected)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (selected.cardmarketId != null) "See on Cardmarket" else "Search on Cardmarket")
+                }
             }
         },
         confirmButton = {
