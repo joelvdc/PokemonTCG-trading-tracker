@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.PokeTrader" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+    </style>
+    <color name="bg">#FFFFF8F0</color>
+    <color name="ic_bg">#FFE3350D</color>
+</resources>
