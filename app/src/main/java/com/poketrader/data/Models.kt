@@ -45,6 +45,29 @@ data class PriceSet(
     fun best(type: PriceType): Double? = get(type) ?: trend ?: avg ?: avg30 ?: avg7 ?: avg1 ?: low
 
     val isEmpty get() = PriceType.entries.all { get(it) == null }
+
+    /** How the price is moving: Cardmarket's trend price vs its 30-day average, or null without both. */
+    val trendChange: PriceTrend? get() = PriceTrend.of(trend, avg30)
+}
+
+/** A price movement in percent, e.g. +12.3 when the trend is 12.3% above the 30-day average. */
+data class PriceTrend(val pct: Double) {
+    val up get() = pct > 0
+    val flat get() = pct == 0.0
+
+    /** "▲ 12.3%", "▼ 0.1%" or "▬ 0.0%": one decimal, and never less than 0.1% for a real change. */
+    fun label(locale: java.util.Locale = java.util.Locale.getDefault()): String {
+        if (flat) return "▬ " + String.format(locale, "%.1f%%", 0.0)
+        val shown = maxOf(abs(pct), 0.1)
+        return (if (up) "▲ " else "▼ ") + String.format(locale, "%.1f%%", shown)
+    }
+
+    companion object {
+        fun of(trend: Double?, avg30: Double?): PriceTrend? {
+            if (trend == null || avg30 == null || avg30 <= 0) return null
+            return PriceTrend((trend - avg30) / avg30 * 100)
+        }
+    }
 }
 
 /**
@@ -140,6 +163,8 @@ data class CollectionRow(
 ) {
     fun unitPrice(type: PriceType): Double? =
         price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice
+
+    val trend: PriceTrend? get() = price?.toSet(item.card.holoPrice)?.trendChange
 }
 
 @Entity(tableName = "trades")

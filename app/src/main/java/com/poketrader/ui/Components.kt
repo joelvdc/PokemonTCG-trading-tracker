@@ -43,6 +43,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,6 +71,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -88,6 +92,7 @@ import com.poketrader.data.TcgplayerImages
 import com.poketrader.data.LANGUAGES
 import com.poketrader.data.PriceEntity
 import com.poketrader.data.PriceSet
+import com.poketrader.data.PriceTrend
 import com.poketrader.data.PriceType
 import com.poketrader.data.Verdict
 import java.text.DateFormat
@@ -309,6 +314,7 @@ fun CardTile(
     language: String = "EN",
     footnote: String? = null,
     footnoteIsWarning: Boolean = false,
+    trend: PriceTrend? = null,
     onClick: () -> Unit,
 ) {
     Column(modifier.clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -345,6 +351,7 @@ fun CardTile(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 2.dp),
         )
+        TrendBadge(trend)
         Text(card.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (footnote != null) {
             Text(
@@ -429,6 +436,28 @@ fun VerdictBanner(balance: Balance, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Shows "[message]" with an Undo button for 10 seconds. Returns true if Undo was tapped.
+ * Replaces any message already showing, so repeated removals don't queue up.
+ */
+suspend fun SnackbarHostState.showUndo(message: String): Boolean {
+    currentSnackbarData?.dismiss()
+    return showSnackbar(message, actionLabel = "Undo", withDismissAction = true, duration = SnackbarDuration.Long) ==
+        SnackbarResult.ActionPerformed
+}
+
+/** Price going up (green ▲), down (red ▼) or unchanged (▬), with the percentage; nothing without data. */
+@Composable
+fun TrendBadge(trend: PriceTrend?, modifier: Modifier = Modifier, style: TextStyle = MaterialTheme.typography.labelMedium) {
+    if (trend == null) return
+    val color = when {
+        trend.flat -> MaterialTheme.colorScheme.onSurfaceVariant
+        trend.up -> TrendColors.up
+        else -> TrendColors.down
+    }
+    Text(trend.label(), color = color, style = style, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = modifier)
+}
+
 @Composable
 fun PriceTable(prices: PriceSet?, highlight: PriceType) {
     Column {
@@ -436,6 +465,12 @@ fun PriceTable(prices: PriceSet?, highlight: PriceType) {
         if (prices == null || prices.isEmpty) {
             Text("No Cardmarket price for this card yet.", style = MaterialTheme.typography.bodySmall)
             return
+        }
+        prices.trendChange?.let { t ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Trend vs 30-day average", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                TrendBadge(t, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         PriceType.entries.forEach { t ->
             val hl = t == highlight
@@ -501,11 +536,13 @@ fun CardDialog(
                         Text("#${selected.numberLabel} · ${selected.rarity}", style = MaterialTheme.typography.bodySmall)
                         if (selected.isJapanese) Text("Japanese print", style = MaterialTheme.typography.bodySmall)
                         if (selected.oversized) Text("Oversized (jumbo) card", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        val selectedPrices = pricesOf(selected, data?.prices?.get(selected.cardmarketId))
                         Text(
-                            Fmt.money(pricesOf(selected, data?.prices?.get(selected.cardmarketId)).best(priceType)),
+                            Fmt.money(selectedPrices.best(priceType)),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                         )
+                        TrendBadge(selectedPrices.trendChange, style = MaterialTheme.typography.titleSmall)
                         if (onChangeCard != null) TextButton(onClick = onChangeCard, enabled = enabled) { Text("Other card…") }
                     }
                 }

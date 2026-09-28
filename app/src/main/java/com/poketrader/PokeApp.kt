@@ -13,6 +13,7 @@ import com.poketrader.data.Repository
 import com.poketrader.data.SetCatalog
 import com.poketrader.data.Settings
 import com.poketrader.data.TcgdexApi
+import com.poketrader.data.TradeWithItems
 import com.poketrader.data.TcgplayerImages
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,10 @@ class AppContainer(context: Context) {
     val network = NetworkMonitor(context)
     val prices = PriceGuideRepository(context, http, db, settings)
     val repo = Repository(db, tcgdex, prices)
+
+    /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
+    @Volatile
+    var deletedTrade: TradeWithItems? = null
 }
 
 val Context.container: AppContainer get() = (applicationContext as PokeApp).container

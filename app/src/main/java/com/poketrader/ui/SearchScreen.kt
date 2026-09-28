@@ -50,7 +50,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +61,7 @@ import com.poketrader.data.CardRef
 import com.poketrader.data.CardTarget
 import com.poketrader.data.ImageKey
 import com.poketrader.data.NumberFilter
+import com.poketrader.data.SearchText
 import com.poketrader.data.Side
 import com.poketrader.data.TcgBrief
 import com.poketrader.scan.CardTextParser
@@ -107,7 +107,8 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
 
     var query by rememberSaveable { mutableStateOf(initialQuery ?: "") }
     var selectedName by rememberSaveable { mutableStateOf(initialQuery) }
-    var numberText by rememberSaveable { mutableStateOf("") }
+    // "pikachu 86/110": the name finds the cards, the number after it narrows them down.
+    val (namePart, numberText) = SearchText.split(query)
     var japanese by rememberSaveable { mutableStateOf(initialQuery?.let { CardTextParser.containsJapanese(it) } ?: false) }
     var suggestions by remember { mutableStateOf(emptyList<String>()) }
     var hits by remember { mutableStateOf<List<Hit>?>(null) }
@@ -118,9 +119,9 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
 
     LaunchedEffect(Unit) { if (initialQuery == null) focus.requestFocus() }
 
-    LaunchedEffect(query, selectedName) {
+    LaunchedEffect(namePart, selectedName) {
         if (selectedName != null) return@LaunchedEffect
-        val q = query.trim()
+        val q = namePart
         if (q.length < 2) {
             suggestions = emptyList()
             return@LaunchedEffect
@@ -168,6 +169,12 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
         }
     }
 
+    /** Chooses a suggested name, keeping any number already typed after it. */
+    fun pick(name: String) {
+        query = if (numberText.isEmpty()) name else "$name $numberText"
+        selectedName = name
+    }
+
     fun open(hit: Hit) = scope.launch {
         try {
             val card = c.tcgdex.card(hit.brief.id, hit.dataLang)
@@ -200,15 +207,21 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
         Column(Modifier.padding(pad).imePadding()) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it; selectedName = null; numberText = "" },
-                placeholder = { Text("Pokémon or card name") },
+                onValueChange = { text ->
+                    query = text
+                    // Typing a number after the chosen name only narrows the results; changing the name starts over.
+                    if (!SearchText.keepsName(text, selectedName)) selectedName = null
+                },
+                placeholder = { Text("Name, + number if you like (Pikachu 86)") },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) IconButton(onClick = { query = ""; selectedName = null }) { Icon(Icons.Default.Clear, "Clear") }
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { query = it; selectedName = it } }),
+                keyboardActions = KeyboardActions(onSearch = {
+                    if (selectedName == null) suggestions.firstOrNull()?.let { pick(it) }
+                }),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).focusRequester(focus),
             )
             if (selectedName != null && !CardTextParser.containsJapanese(selectedName ?: "")) {
@@ -216,22 +229,6 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                     FilterChip(selected = !japanese, onClick = { japanese = false }, label = { Text("🌍 International") })
                     FilterChip(selected = japanese, onClick = { japanese = true }, label = { Text("🇯🇵 Japanese") })
                 }
-            }
-            if (selectedName != null) {
-                // The number printed at the bottom of the card, e.g. "86/110": quickest way to find one card.
-                OutlinedTextField(
-                    value = numberText,
-                    onValueChange = { numberText = it },
-                    label = { Text("Card number") },
-                    placeholder = { Text("e.g. 86 or 86/110") },
-                    leadingIcon = { Text("#", style = MaterialTheme.typography.titleMedium) },
-                    trailingIcon = {
-                        if (numberText.isNotEmpty()) IconButton(onClick = { numberText = "" }) { Icon(Icons.Default.Clear, "Clear number") }
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                )
             }
             message?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
@@ -244,7 +241,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                     items(suggestions) { name ->
                         ListItem(
                             headlineContent = { Text(name, style = MaterialTheme.typography.titleMedium) },
-                            modifier = Modifier.clickable { query = name; selectedName = name },
+                            modifier = Modifier.clickable { pick(name) },
                         )
                         HorizontalDivider()
                     }

@@ -325,3 +325,47 @@ class FallbackImagesTest {
         FallbackImages.setIds = emptyMap()
     }
 }
+
+class SearchTextAndTrendTest {
+    @Test
+    fun splitsNameAndNumber() {
+        assertEquals("pikachu" to "86", com.poketrader.data.SearchText.split("pikachu 86"))
+        assertEquals("pikachu" to "86/110", com.poketrader.data.SearchText.split(" pikachu 86/110 "))
+        assertEquals("pikachu" to "#86", com.poketrader.data.SearchText.split("pikachu #86"))
+        assertEquals("Pikachu" to "86/110", com.poketrader.data.SearchText.split("Pikachu 86 / 110"))
+        assertEquals("Charizard ex" to "TG05", com.poketrader.data.SearchText.split("Charizard ex TG05"))
+        assertEquals("ピカチュウ" to "025", com.poketrader.data.SearchText.split("ピカチュウ 025"))
+        // Names stay whole.
+        assertEquals("Pikachu V" to "", com.poketrader.data.SearchText.split("Pikachu V"))
+        assertEquals("Porygon2" to "", com.poketrader.data.SearchText.split("Porygon2"))
+        assertEquals("pikachu" to "", com.poketrader.data.SearchText.split("pikachu"))
+        assertEquals("pikachu" to "25/", com.poketrader.data.SearchText.split("pikachu 25/")) // still typing
+    }
+
+    @Test
+    fun editingTheNumberKeepsTheChosenName() {
+        val st = com.poketrader.data.SearchText
+        assertTrue(st.keepsName("Pikachu 25/", "Pikachu"))
+        assertTrue(st.keepsName("Pikachu 4", "Pikachu"))
+        assertTrue(st.keepsName("Pikachu ", "Pikachu"))
+        assertTrue(st.keepsName("Pikachu", "Pikachu"))
+        assertTrue(st.keepsName("pikachu #TG05", "Pikachu"))
+        assertFalse(st.keepsName("Pikachu V", "Pikachu"))   // a different card name
+        assertFalse(st.keepsName("Pikach", "Pikachu"))
+        assertFalse(st.keepsName("Pikachu 86", null))
+    }
+
+    @Test
+    fun trendLabelsHaveOneDecimalAndAMinimumOfPointOne() {
+        val l = java.util.Locale.UK
+        assertEquals("▲ 12.3%", com.poketrader.data.PriceTrend.of(11.23, 10.0)!!.label(l))
+        assertEquals("▼ 8.0%", com.poketrader.data.PriceTrend.of(9.2, 10.0)!!.label(l))
+        assertEquals("▲ 0.1%", com.poketrader.data.PriceTrend.of(10.001, 10.0)!!.label(l)) // 0.01% shows as the minimum
+        assertEquals("▼ 0.1%", com.poketrader.data.PriceTrend.of(9.999, 10.0)!!.label(l))
+        assertEquals("▬ 0.0%", com.poketrader.data.PriceTrend.of(0.02, 0.02)!!.label(l)) // exactly unchanged
+        assertEquals("▲ 12,3%", com.poketrader.data.PriceTrend.of(11.23, 10.0)!!.label(java.util.Locale.GERMANY))
+        assertNull(com.poketrader.data.PriceTrend.of(1.0, null))
+        assertNull(com.poketrader.data.PriceTrend.of(null, 1.0))
+        assertNull(com.poketrader.data.PriceTrend.of(1.0, 0.0))
+    }
+}

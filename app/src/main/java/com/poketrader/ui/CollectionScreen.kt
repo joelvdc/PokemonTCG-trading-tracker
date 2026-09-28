@@ -197,6 +197,7 @@ fun CollectionScreen(nav: NavController) {
                             price = row.unitPrice(priceType),
                             quantity = row.item.quantity,
                             language = row.item.language,
+                            trend = row.trend,
                         ) { editing = row }
                     }
                 }
@@ -219,7 +220,13 @@ fun CollectionScreen(nav: NavController) {
                     c.repo.updateCollectionItem(item.copy(card = card, quantity = v.quantity, condition = v.condition, language = v.language))
                 }
             },
-            onDelete = { editing = null; scope.launch { c.repo.deleteCollectionItem(item.id) } },
+            onDelete = {
+                editing = null
+                scope.launch {
+                    c.repo.deleteCollectionItem(item.id)
+                    if (snackbar.showUndo("${item.card.name} removed")) c.repo.restoreCollectionItem(item)
+                }
+            },
             onChangeCard = {
                 editing = null
                 nav.openSearch(CardTarget.ReplaceCollectionItem(item.id), item.card.name)
