@@ -3,6 +3,10 @@
 A kid-friendly app for trading Pokémon cards: scan or search the cards on each side, see at a glance whether the
 trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up to date when the trade is done.
 
+| Trade | Search | Card | My cards |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="The collection"> |
+
 ## Install
 Copy `PokeTrader-1.4.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
@@ -58,3 +62,12 @@ card images in `app/src/androidTest/assets`, needs a device/emulator with intern
 - `scan/CardTextParser.kt` – reads name / number / set code / language from OCR lines.
 - `scan/CardRecognizer.kt` – turns those clues into a card (or a "which one is it?" choice).
 - `ui/` – Compose screens.
+
+## License and disclaimer
+The code is released under the [MIT License](LICENSE). That covers this app's code only, not the card data, names or
+pictures it shows.
+
+Poké Trader is an unofficial fan project. It isn't affiliated with, endorsed or sponsored by Nintendo, Creatures,
+GAME FREAK or The Pokémon Company; Pokémon and the card names and pictures are their trademarks and property.
+It also isn't affiliated with TCGdex, Cardmarket, pokemontcg.io or TCGplayer; it uses their public data. Prices are for
+guidance only.
