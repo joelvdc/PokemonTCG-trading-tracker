@@ -6,6 +6,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.util.DebugLogger
 import com.poketrader.data.AppDatabase
+import com.poketrader.data.CardmarketCatalog
+import com.poketrader.data.DataUpdater
 import com.poketrader.data.FallbackImageSets
 import com.poketrader.data.NetworkMonitor
 import com.poketrader.data.PriceGuideRepository
@@ -56,6 +58,10 @@ class AppContainer(context: Context) {
     val network = NetworkMonitor(context)
     val prices = PriceGuideRepository(context, http, db, settings)
     val repo = Repository(db, tcgdex, prices, appScope)
+    val catalog = CardmarketCatalog(context, http, db, settings, tcgdex).also { cat ->
+        tcgdex.repair = { card, lang -> cat.repair(card, lang) }
+    }
+    val updater = DataUpdater(context, settings, prices, catalog, repo, network)
 
     /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
     @Volatile

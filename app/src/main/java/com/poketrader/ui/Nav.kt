@@ -63,7 +63,11 @@ fun AppNav() {
     val nav = rememberNavController()
     val c = LocalContext.current.container
     LaunchedEffect(Unit) {
-        c.appScope.launch { c.prices.refreshIfStale() }
+        c.updater.schedule()
+        c.appScope.launch {
+            c.updater.autoUpdate()
+            c.updater.repairAfterUpgrade()
+        }
         // Warm up the set lists the scanner needs.
         c.appScope.launch { runCatching { c.sets.sets("en"); c.sets.sets("ja") } }
         // Pictures for international cards TCGdex has none for.
@@ -74,13 +78,17 @@ fun AppNav() {
     val topLevel = tabs.any { it.route == route }
     val priceState by c.prices.state.collectAsStateWithLifecycle()
     val scanCount by remember { c.db.scanDao().observeCount() }.collectAsStateWithLifecycle(0)
+    val catalogState by c.catalog.state.collectAsStateWithLifecycle()
+    // Coming back online (e.g. onto Wi-Fi) is a good moment for an update that couldn't run before.
+    val reconnects by c.network.reconnects.collectAsStateWithLifecycle()
+    LaunchedEffect(reconnects) { if (reconnects > 0) c.appScope.launch { c.updater.autoUpdate() } }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (topLevel) {
                 Column {
-                    PriceStatusStrip(priceState)
+                    PriceStatusStrip(if (priceState == PriceUpdateState.Idle && catalogState is PriceUpdateState.Running) catalogState else priceState)
                     NavigationBar {
                         tabs.forEach { tab ->
                             NavigationBarItem(

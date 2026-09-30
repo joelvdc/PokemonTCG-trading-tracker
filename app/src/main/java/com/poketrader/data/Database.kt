@@ -189,6 +189,9 @@ interface ScanDao {
     @Query("SELECT * FROM scans WHERE id = :id")
     suspend fun byId(id: Long): ScannedCard?
 
+    @Query("SELECT * FROM scans")
+    suspend fun all(): List<ScannedCard>
+
     @Query("SELECT * FROM scans WHERE id IN (:ids)")
     suspend fun byIds(ids: List<Long>): List<ScannedCard>
 
@@ -209,8 +212,11 @@ interface ScanDao {
 }
 
 @Database(
-    entities = [PriceEntity::class, CollectionItem::class, Trade::class, TradeItem::class, Binder::class, ScannedCard::class],
-    version = 2,
+    entities = [
+        PriceEntity::class, CollectionItem::class, Trade::class, TradeItem::class, Binder::class, ScannedCard::class,
+        CmProduct::class, CmSetExpansion::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -219,12 +225,20 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tradeDao(): TradeDao
     abstract fun binderDao(): BinderDao
     abstract fun scanDao(): ScanDao
+    abstract fun catalogDao(): CatalogDao
 
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "poketrader.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
+
+        /** Version 3 (app 1.6): Cardmarket's product list, to check and fill in TCGdex's Cardmarket links. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                V3_TABLES_SQL.forEach(db::execSQL)
+            }
+        }
 
         /** Version 2 (app 1.5): binders and the Scan tab's waiting list. */
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -238,6 +252,14 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+
+/** New tables of version 3, exactly as Room creates them (copied from the generated AppDatabase_Impl). */
+private val V3_TABLES_SQL = listOf(
+    "CREATE TABLE IF NOT EXISTS `cm_products` (`idProduct` INTEGER NOT NULL, `name` TEXT NOT NULL, " +
+        "`idExpansion` INTEGER NOT NULL, PRIMARY KEY(`idProduct`))",
+    "CREATE INDEX IF NOT EXISTS `index_cm_products_idExpansion` ON `cm_products` (`idExpansion`)",
+    "CREATE TABLE IF NOT EXISTS `cm_set_expansions` (`key` TEXT NOT NULL, `idExpansion` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+)
 
 /** New tables and index of version 2, exactly as Room creates them (copied from the generated AppDatabase_Impl). */
 private val V2_TABLES_SQL = listOf(

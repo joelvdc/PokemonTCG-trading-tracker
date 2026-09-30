@@ -44,8 +44,10 @@ class PriceGuideRepository(
     val state: StateFlow<PriceUpdateState> = _state
     val count = dao.count()
 
+    val isStale get() = System.currentTimeMillis() - settings.lastPriceFetch.value > MAX_AGE_MS
+
     suspend fun refreshIfStale() {
-        if (System.currentTimeMillis() - settings.lastPriceFetch.value > MAX_AGE_MS) refresh()
+        if (isStale) refresh()
     }
 
     suspend fun refresh(): Boolean = lock.withLock {

@@ -19,6 +19,41 @@ class Settings(context: Context) {
     private val _guideDate = MutableStateFlow(prefs.getString("priceGuideDate", null))
     val priceGuideDate: StateFlow<String?> = _guideDate
 
+    private val _catalogFetchedAt = MutableStateFlow(prefs.getLong("catalogFetchedAt", 0L))
+    val catalogFetchedAt: StateFlow<Long> = _catalogFetchedAt
+
+    private val _catalogDate = MutableStateFlow(prefs.getString("catalogDate", null))
+    val catalogDate: StateFlow<String?> = _catalogDate
+
+    /** Update prices and the card list by themselves (on opening the app and in the background). */
+    private val _autoUpdate = MutableStateFlow(prefs.getBoolean("autoUpdate", true))
+    val autoUpdate: StateFlow<Boolean> = _autoUpdate
+
+    /** Automatic updates only on Wi-Fi (or another unmetered connection). */
+    private val _wifiOnly = MutableStateFlow(prefs.getBoolean("wifiOnly", false))
+    val wifiOnly: StateFlow<Boolean> = _wifiOnly
+
+    /** How far saved cards' Cardmarket links have been checked; see [Repository.repairSavedCards]. */
+    var cardLinksVersion: Int
+        get() = prefs.getInt("cardLinksVersion", 0)
+        set(v) = prefs.edit().putInt("cardLinksVersion", v).apply()
+
+    fun setAutoUpdate(on: Boolean) {
+        _autoUpdate.value = on
+        prefs.edit().putBoolean("autoUpdate", on).apply()
+    }
+
+    fun setWifiOnly(on: Boolean) {
+        _wifiOnly.value = on
+        prefs.edit().putBoolean("wifiOnly", on).apply()
+    }
+
+    fun setCatalogFetched(createdAt: String?, at: Long) {
+        _catalogFetchedAt.value = at
+        _catalogDate.value = createdAt
+        prefs.edit().putLong("catalogFetchedAt", at).putString("catalogDate", createdAt).apply()
+    }
+
     fun setPriceType(t: PriceType) {
         _priceType.value = t
         prefs.edit().putString("priceType", t.key).apply()

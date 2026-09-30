@@ -8,9 +8,9 @@ trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up 
 | <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="The collection"> |
 
 ## Install
-Copy `PokeTrader-1.5.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.6.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.5-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.6-universal.apk` instead (bigger, runs on any device).
 
 ## Binders
 "My cards" can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
@@ -31,6 +31,14 @@ binder** or **to a trade**, or **discard** them.
 - **Prices:** Cardmarket's public daily Pokémon price guide (`price_guide_6.json`, ~15 MB), downloaded once a day.
   Each card *variant* (normal, reverse holo, Poké Ball / Master Ball pattern, stamped…) has its own Cardmarket
   product id in TCGdex; reverse holos use the guide's "holo" price columns.
+- **Checking TCGdex's Cardmarket links:** Cardmarket's public list of Pokémon singles (`products_singles_6.json`,
+  ~14 MB, weekly) names every product with its attacks, e.g. "Erika's Bellsprout [Careless Tackle]". The app uses it
+  to fill in cards TCGdex doesn't link, and to replace links that point to another card (Gym Heroes' "Erika's …"
+  cards → "Erika", Hidden Fates' Charizard GX 9/68 → the shiny one). A link is only replaced when a product with the
+  same name and a matching attack is found in the card's set. Plain versions without their own link use the link
+  TCGdex has for the card as a whole. Japanese cards (Japanese names) can't be matched this way.
+- **Updates:** automatic by default (on opening the app and in the background); Settings can turn them off or limit
+  them to Wi-Fi. "Update now" always runs.
 - **Pokémon TCG Pocket** (the phone game) cards are in TCGdex too; they're filtered out everywhere since they don't
   exist on paper.
 

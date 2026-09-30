@@ -397,6 +397,52 @@ class Repository(
         id
     }
 
+    // ---- Cardmarket links ----------------------------------------------------------------
+
+    /**
+     * Re-checks the Cardmarket product of saved cards and updates the ones that changed (in "My
+     * cards", open trades and the scan list; completed trades keep their prices but get the
+     * corrected link). With [full], every international card is looked up again — needed to catch
+     * links to a same-named but different card, which only the card's attacks reveal; otherwise
+     * only cards without a link, or with one [catalog] names differently. Returns how many changed.
+     */
+    suspend fun repairSavedCards(catalog: CardmarketCatalog, full: Boolean): Int {
+        val collection = coll.all()
+        val allTrades = trades.all()
+        val scanned = scans.all()
+        val refs = collection.map { it.card } + allTrades.flatMap { t -> t.items.map { it.card } } + scanned.map { it.card }
+        val suspicious = refs.filter { r ->
+            r.cardmarketId == null || (!r.isJapanese && (full || catalog.looksWrong(r.name, r.cardmarketId)))
+        }.map { it.cardId to it.dataLang }.distinct()
+        var changed = 0
+        for ((cardId, lang) in suspicious) {
+            val card = runCatching { tcgdex.card(cardId, lang) }.getOrNull() ?: continue
+            val byVariant = card.printings(lang).associateBy { it.variantId }
+            fun fixed(old: CardRef): CardRef? {
+                val p = byVariant[old.variantId] ?: return null
+                if (p.cardmarketId == old.cardmarketId || p.cardmarketId == null) return null
+                return old.copy(cardmarketId = p.cardmarketId, fallbackPrice = p.fallbackPrice ?: old.fallbackPrice)
+            }
+            db.withTransaction {
+                collection.filter { it.card.cardId == cardId && it.card.dataLang == lang }.forEach { item ->
+                    fixed(item.card)?.let { coll.byId(item.id)?.let { cur -> coll.update(cur.copy(card = it)); changed++ } }
+                }
+                allTrades.forEach { t ->
+                    t.items.filter { it.card.cardId == cardId && it.card.dataLang == lang }.forEach { item ->
+                        fixed(item.card)?.let { ref ->
+                            trades.updateItem(if (t.trade.applied) item.copy(card = ref) else item.copy(card = ref, prices = snapshot(ref)))
+                            changed++
+                        }
+                    }
+                }
+                scanned.filter { it.card.cardId == cardId && it.card.dataLang == lang }.forEach { item ->
+                    fixed(item.card)?.let { scans.update(item.copy(card = it)); changed++ }
+                }
+            }
+        }
+        return changed
+    }
+
     // ---- CSV -----------------------------------------------------------------------------
 
     private val collectionHeader = listOf(

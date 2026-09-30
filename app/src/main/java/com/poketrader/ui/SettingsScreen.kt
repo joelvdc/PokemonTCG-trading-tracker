@@ -16,6 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -52,6 +54,11 @@ fun SettingsScreen() {
     val guideDate by c.settings.priceGuideDate.collectAsStateWithLifecycle()
     val count by c.prices.count.collectAsStateWithLifecycle(0)
     val state by c.prices.state.collectAsStateWithLifecycle()
+    val catalogState by c.catalog.state.collectAsStateWithLifecycle()
+    val catalogCount by c.catalog.count.collectAsStateWithLifecycle(0)
+    val catalogFetched by c.settings.catalogFetchedAt.collectAsStateWithLifecycle()
+    val autoUpdate by c.settings.autoUpdate.collectAsStateWithLifecycle()
+    val wifiOnly by c.settings.wifiOnly.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -87,24 +94,41 @@ fun SettingsScreen() {
             )
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            Text("Cardmarket price data", style = MaterialTheme.typography.titleMedium)
+            Text("Cardmarket data", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text("Price guide date: ${formatGuideDate(guideDate)}")
             Text("Products with prices: $count")
-            Text("Last downloaded: ${if (lastFetch == 0L) "never" else Fmt.dateTime(lastFetch)}")
-            when (val s = state) {
-                is PriceUpdateState.Running -> Text(s.message, color = MaterialTheme.colorScheme.primary)
-                is PriceUpdateState.Failed -> Text("Last update failed: ${s.message}", color = MaterialTheme.colorScheme.error)
-                PriceUpdateState.Idle -> {}
+            Text("Prices downloaded: ${if (lastFetch == 0L) "never" else Fmt.dateTime(lastFetch)}")
+            Text("Card list: ${if (catalogCount == 0) "not downloaded yet" else "$catalogCount cards, downloaded ${Fmt.dateTime(catalogFetched)}"}")
+            listOf(state, catalogState).forEach { s ->
+                when (s) {
+                    is PriceUpdateState.Running -> Text(s.message, color = MaterialTheme.colorScheme.primary)
+                    is PriceUpdateState.Failed -> Text("Last update failed: ${s.message}", color = MaterialTheme.colorScheme.error)
+                    PriceUpdateState.Idle -> {}
+                }
             }
             Spacer(Modifier.height(8.dp))
             Button(
-                onClick = { c.appScope.launch { c.prices.refresh() } },
-                enabled = state !is PriceUpdateState.Running,
-            ) { Text("Update prices now") }
+                onClick = { c.appScope.launch { c.updater.updateNow() } },
+                enabled = state !is PriceUpdateState.Running && catalogState !is PriceUpdateState.Running,
+            ) { Text("Update now") }
+            Spacer(Modifier.height(12.dp))
+            SwitchRow(
+                title = "Update automatically",
+                body = "Prices once a day (about 15 MB) and Cardmarket's card list once a week (about 14 MB), when you open the app and in the background.",
+                checked = autoUpdate,
+                onChange = { c.settings.setAutoUpdate(it); c.updater.schedule() },
+            )
+            SwitchRow(
+                title = "Only on Wi-Fi",
+                body = "Automatic updates wait for Wi-Fi, so they don't use mobile data. “Update now” always works.",
+                checked = wifiOnly,
+                enabled = autoUpdate,
+                onChange = { c.settings.setWifiOnly(it); c.updater.schedule() },
+            )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Prices update automatically when you open the app and the data is older than 20 hours (about a 15 MB download). " +
+                "The card list is used to check TCGdex's links to Cardmarket, so cards TCGdex doesn't link (or links to the wrong card) still get a price. " +
                     "Cards already in a trade keep the price they had when added — use “Refresh prices” in a trade to update them.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -120,6 +144,20 @@ fun SettingsScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = enabled) { onChange(!checked) }.padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
 

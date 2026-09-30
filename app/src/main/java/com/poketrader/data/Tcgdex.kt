@@ -93,6 +93,12 @@ data class TcgCardSet(
 )
 
 @Serializable
+data class TcgAttack(val name: String = "")
+
+/** A Cardmarket product chosen for one variant after checking TCGdex's link; see [CardmarketCatalog]. */
+data class CardmarketFix(val idProduct: Int?)
+
+@Serializable
 data class TcgCard(
     val id: String,
     val localId: String = "",
@@ -104,14 +110,17 @@ data class TcgCard(
     val set: TcgCardSet,
     val variants: TcgVariantFlags? = null,
     @SerialName("variants_detailed") val variantsDetailed: List<TcgVariant>? = null,
+    val attacks: List<TcgAttack>? = null,
+    /** Card-level Cardmarket link; TCGdex sometimes has it here but not on the variants. */
+    val thirdParty: TcgThirdParty? = null,
+    val pricing: TcgPricing? = null,
+    /** Corrections from [CardmarketCatalog], by variant id; not part of TCGdex's data. */
+    @kotlinx.serialization.Transient val cardmarketFixes: Map<String, CardmarketFix> = emptyMap(),
 ) {
-    /**
-     * Every variant of this card as a [CardRef]: standard-size ones first (most common first),
-     * then oversized (jumbo) prints, which Cardmarket sells and prices as separate products.
-     */
-    fun printings(dataLang: String): List<CardRef> {
+    /** TCGdex's variants, or ones made up from the variant flags when it has no detailed list. */
+    private fun variantList(): List<TcgVariant> {
         val detailed = variantsDetailed.orEmpty().sortedBy { it.isOversized }
-        val variants = detailed.ifEmpty {
+        return detailed.ifEmpty {
             val f = variants ?: TcgVariantFlags(normal = true)
             buildList {
                 if (f.normal) add(TcgVariant("normal", variantId = "normal"))
@@ -120,9 +129,40 @@ data class TcgCard(
                 if (f.firstEdition) add(TcgVariant(if (f.holo) "holo" else "normal", stamp = listOf("1st-edition"), variantId = "1st-edition"))
             }.ifEmpty { listOf(TcgVariant("normal", variantId = "normal")) }
         }
-        return variants.mapIndexed { i, v ->
+    }
+
+    /** The card-level Cardmarket product, if TCGdex has one. */
+    val cardLevelCardmarketId: Int? get() = thirdParty?.cardmarket ?: pricing?.cardmarket?.idProduct
+
+    /**
+     * A variant sold as the card's regular Cardmarket product: standard size, no special foil,
+     * no stamp other than 1st Edition. (Stamped, patterned and jumbo prints are separate products.)
+     */
+    fun isPlain(v: TcgVariant) = !v.isOversized && v.foil == null && v.stamp.all { it == "1st-edition" }
+
+    /** Each variant with the Cardmarket product TCGdex links to it, before [cardmarketFixes]. */
+    fun tcgdexLinks(): List<Pair<TcgVariant, Int?>> = variantList().mapIndexed { i, v ->
+        val own = v.thirdParty?.cardmarket ?: v.pricing?.cardmarket?.idProduct
+        v.copy(variantId = v.variantId.ifEmpty { "v$i" }) to (own ?: if (isPlain(v)) cardLevelCardmarketId else null)
+    }
+
+    /**
+     * Every variant of this card as a [CardRef]: standard-size ones first (most common first),
+     * then oversized (jumbo) prints, which Cardmarket sells and prices as separate products.
+     */
+    fun printings(dataLang: String): List<CardRef> =
+        tcgdexLinks().map { (v, linked) ->
             val holoPrice = v.type == "reverse"
-            val cm = v.pricing?.cardmarket
+            val own = v.pricing?.cardmarket
+            val fix = cardmarketFixes[v.variantId]
+            val cardmarketId = if (fix != null) fix.idProduct else linked
+            // TCGdex's last-known price only belongs to the product it links; a corrected product has none.
+            val cm = when {
+                fix != null && fix.idProduct != linked -> null
+                own?.idProduct != null || own?.trend != null -> own
+                linked != null -> pricing?.cardmarket
+                else -> null
+            }
             CardRef(
                 cardId = id,
                 dataLang = dataLang,
@@ -133,15 +173,14 @@ data class TcgCard(
                 setOfficial = set.cardCount.official?.takeIf { it > 0 },
                 rarity = rarity ?: "",
                 imageBase = image,
-                variantId = v.variantId.ifEmpty { "v$i" },
+                variantId = v.variantId,
                 variantLabel = variantLabel(v),
-                cardmarketId = v.thirdParty?.cardmarket ?: cm?.idProduct,
+                cardmarketId = cardmarketId,
                 holoPrice = holoPrice,
                 fallbackPrice = (if (holoPrice) cm?.trendHolo ?: cm?.trend else cm?.trend ?: cm?.trendHolo)?.takeIf { it > 0 },
                 firstEdition = "1st-edition" in v.stamp,
             )
         }.distinctBy { it.variantId }
-    }
 
     /** The variant to use when none was chosen: plain first, or the first reverse holo if [preferHolo]. */
     fun defaultPrinting(dataLang: String, preferHolo: Boolean): CardRef {
@@ -188,6 +227,9 @@ fun variantLabel(v: TcgVariant): String {
 
 @Serializable
 private data class TcgSerie(val id: String, val sets: List<TcgSetBrief> = emptyList())
+
+@Serializable
+private data class TcgSetCards(val id: String = "", val cards: List<TcgBrief> = emptyList())
 
 /**
  * Minimal TCGdex REST client (api.tcgdex.net). [lang] is TCGdex's language code:
@@ -238,7 +280,20 @@ class TcgdexApi(private val http: OkHttpClient) {
     /** All cards of one Pokémon by National Pokédex number — works across languages (e.g. to find Japanese prints). */
     suspend fun cardsByDex(dexId: Int, lang: String): List<TcgBrief> = briefs(url(lang, "cards", "dexId" to "eq:$dexId"))
 
-    suspend fun card(id: String, lang: String): TcgCard? {
+    /**
+     * Checks and corrects a card's Cardmarket links (see [CardmarketCatalog]); set once at start-up.
+     * Cards come back unchanged until it's set, or if it fails.
+     */
+    @Volatile
+    var repair: (suspend (TcgCard, String) -> TcgCard)? = null
+
+    private suspend fun repaired(card: TcgCard, lang: String): TcgCard =
+        repair?.let { fix -> runCatching { fix(card, lang) }.getOrNull() } ?: card
+
+    suspend fun card(id: String, lang: String): TcgCard? = cardAsIs(id, lang)?.let { repaired(it, lang) }
+
+    /** A card exactly as TCGdex has it, without Cardmarket corrections. */
+    suspend fun cardAsIs(id: String, lang: String): TcgCard? {
         val body = call(url(lang, "cards/$id")) ?: return null
         return json.decodeFromString<TcgCard>(body)
     }
@@ -249,9 +304,15 @@ class TcgdexApi(private val http: OkHttpClient) {
         val tries = linkedSetOf(number, stripped, stripped.padStart(3, '0'))
         for (n in tries) {
             val body = call(url(lang, "sets/$setId/$n")) ?: continue
-            return json.decodeFromString<TcgCard>(body)
+            return repaired(json.decodeFromString<TcgCard>(body), lang)
         }
         return null
+    }
+
+    /** The cards of one set (brief form). */
+    suspend fun setCards(setId: String, lang: String): List<TcgBrief> {
+        val body = call(url(lang, "sets/$setId")) ?: return emptyList()
+        return json.decodeFromString<TcgSetCards>(body).cards
     }
 
     suspend fun sets(lang: String): List<TcgSetBrief> {
