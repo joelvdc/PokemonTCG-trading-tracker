@@ -191,9 +191,10 @@ class ScanController(
         val printings = card.printings(dataLang)
         val ref = card.defaultPrinting(dataLang, holo)
         val lang = language ?: if (dataLang == "ja") "JA" else "EN"
-        val result = c.repo.add(target, ref, lang) ?: return
+        val hasJumbo = printings.any { it.oversized }
+        val result = c.repo.add(target, ref, lang, hasJumbo = hasJumbo) ?: return
         val price = c.repo.snapshot(ref).best(PriceType.TREND) ?: ref.fallbackPrice
-        added.add(0, ScannedEntry(ref, lang, result, price, hasJumbo = printings.any { it.oversized }))
+        added.add(0, ScannedEntry(ref, lang, result, price, hasJumbo = hasJumbo))
         status = "Added ${card.name}!"
         onAdded()
     }
@@ -257,7 +258,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                 title = {
                     Column {
                         Text("Scan cards")
-                        Text(targetLabel(target), style = MaterialTheme.typography.bodySmall)
+                        Text(rememberTargetLabel(target), style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
@@ -367,15 +368,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
             onConfirm = { card, v ->
                 editing = null
                 scope.launch {
-                    if (e.result.inTrade) {
-                        c.db.tradeDao().item(e.result.itemId)?.let {
-                            c.repo.updateTradeItem(it.copy(card = card, language = v.language, condition = v.condition))
-                        }
-                    } else {
-                        c.db.collectionDao().byId(e.result.itemId)?.let {
-                            c.repo.updateCollectionItem(it.copy(card = card, language = v.language, condition = v.condition))
-                        }
-                    }
+                    c.repo.changeAdded(e.result, card, v.condition, v.language)
                     controller.replace(e, card, v.language)
                 }
             },

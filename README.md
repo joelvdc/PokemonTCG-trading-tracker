@@ -8,9 +8,21 @@ trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up 
 | <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="The collection"> |
 
 ## Install
-Copy `PokeTrader-1.4.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.5.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.4-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.5-universal.apk` instead (bigger, runs on any device).
+
+## Binders
+"My cards" can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
+binder with its card count. From the ⋮ menu you can create, rename, delete and **merge** binders (e.g. a "new cards"
+binder into your main one; identical cards are combined). Tap a card to move it, or some of its copies, to another
+binder. "We traded!" asks which binder the new cards go into (or makes a new one); cards you give are taken from
+Unsorted first. The CSV backup keeps each card's binder. Card tiles show the price of one card, with the total for a
+stack underneath ("×4 · €80.00"), and "Most valuable" sorts by that single-card price.
+
+## Scan tab
+Scan a pile of cards (or add them by name) into a waiting list, then select some or all of them and send them **to a
+binder** or **to a trade**, or **discard** them.
 
 ## Where the data comes from (no app updates needed for new sets)
 - **Cards, pictures, names in all languages:** [TCGdex](https://tcgdex.net) (free, open API), looked up live.

@@ -6,7 +6,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.runtime.remember
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Icon
@@ -43,6 +47,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 private val tabs = listOf(
     Tab("trades", "Trades", Icons.Default.SwapHoriz),
     Tab("collection", "My cards", Icons.Default.CollectionsBookmark),
+    Tab("scans", "Scan", Icons.Default.CameraAlt),
     Tab("settings", "Settings", Icons.Default.Settings),
 )
 
@@ -68,6 +73,7 @@ fun AppNav() {
     val route = entry?.destination?.route
     val topLevel = tabs.any { it.route == route }
     val priceState by c.prices.state.collectAsStateWithLifecycle()
+    val scanCount by remember { c.db.scanDao().observeCount() }.collectAsStateWithLifecycle(0)
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -86,8 +92,14 @@ fun AppNav() {
                                         restoreState = true
                                     }
                                 },
-                                icon = { Icon(tab.icon, null) },
-                                label = { Text(tab.label) },
+                                icon = {
+                                    if (tab.route == "scans" && scanCount > 0) {
+                                        BadgedBox(badge = { Badge { Text("$scanCount") } }) { Icon(tab.icon, null) }
+                                    } else {
+                                        Icon(tab.icon, null)
+                                    }
+                                },
+                                label = { Text(tab.label, maxLines = 1) },
                             )
                         }
                     }
@@ -98,6 +110,7 @@ fun AppNav() {
         NavHost(nav, startDestination = "trades", modifier = Modifier.padding(pad)) {
             composable("trades") { TradesListScreen(nav) }
             composable("collection") { CollectionScreen(nav) }
+            composable("scans") { ScansScreen(nav) }
             composable("settings") { SettingsScreen() }
             composable("trade/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                 TradeEditorScreen(nav, it.arguments?.getLong("id") ?: 0L)

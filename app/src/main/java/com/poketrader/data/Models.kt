@@ -1,5 +1,6 @@
 package com.poketrader.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -143,7 +144,7 @@ data class CardRef(
 @Entity(
     tableName = "collection",
     indices = [
-        Index(value = ["cardId", "dataLang", "variantId", "condition", "language"], unique = true),
+        Index(value = ["cardId", "dataLang", "variantId", "condition", "language", "binderId"], unique = true),
         Index("name"),
     ],
 )
@@ -154,7 +155,50 @@ data class CollectionItem(
     val language: String = "EN",
     val quantity: Int,
     val addedAt: Long = System.currentTimeMillis(),
+    /** The [Binder] this stack is in, or [Binder.UNSORTED]. Since version 1.5. */
+    @ColumnInfo(defaultValue = "0") val binderId: Long = Binder.UNSORTED,
 )
+
+/** A named group of cards in "My cards", like a real binder. Since version 1.5. */
+@Entity(tableName = "binders")
+data class Binder(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long = System.currentTimeMillis(),
+) {
+    companion object {
+        /** Cards that aren't in any binder. */
+        const val UNSORTED = 0L
+        const val UNSORTED_NAME = "Unsorted"
+    }
+}
+
+/** Where cards should go: an existing binder, Unsorted, or a binder still to be created with [newName]. */
+data class BinderChoice(val binderId: Long = Binder.UNSORTED, val newName: String? = null)
+
+/** A scanned card waiting in the Scan tab until it's sent to a binder or trade, or discarded. Since 1.5. */
+@Entity(tableName = "scans")
+data class ScannedCard(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @Embedded val card: CardRef,
+    val condition: String = "NM",
+    val language: String = "EN",
+    val quantity: Int = 1,
+    /** The card also exists as a jumbo print; the camera can't tell the size, so the list offers a check. */
+    val hasJumbo: Boolean = false,
+    val scannedAt: Long = System.currentTimeMillis(),
+)
+
+/** Scanned card joined with today's price guide entry. */
+data class ScanRow(
+    @Embedded val item: ScannedCard,
+    @Embedded(prefix = "pr_") val price: PriceEntity?,
+) {
+    fun unitPrice(type: PriceType): Double? =
+        price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice
+
+    val trend: PriceTrend? get() = price?.toSet(item.card.holoPrice)?.trendChange
+}
 
 /** Collection row joined with today's price guide entry. */
 data class CollectionRow(
@@ -175,6 +219,8 @@ data class Trade(
     val notes: String = "",
     val applied: Boolean = false,
     val appliedAt: Long? = null,
+    /** The binder the cards you got went into when the trade was applied. Since version 1.5. */
+    @ColumnInfo(defaultValue = "0") val binderId: Long = Binder.UNSORTED,
 )
 
 object Side {
@@ -205,6 +251,8 @@ data class TradeItem(
     /** How many copies were actually added (+) / removed (−) from the collection when the trade was applied. */
     val appliedDelta: Int = 0,
     val addedAt: Long = System.currentTimeMillis(),
+    /** For given cards: the binder they were (mostly) taken from, so undoing puts them back there. Since 1.5. */
+    @ColumnInfo(defaultValue = "0") val appliedBinderId: Long = Binder.UNSORTED,
 ) {
     fun unitPrice(type: PriceType): Double? = customPrice ?: prices.best(type) ?: card.fallbackPrice
     fun lineTotal(type: PriceType): Double = (unitPrice(type) ?: 0.0) * quantity

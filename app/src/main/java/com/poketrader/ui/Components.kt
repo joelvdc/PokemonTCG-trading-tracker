@@ -84,6 +84,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.poketrader.container
 import com.poketrader.data.Balance
+import com.poketrader.data.Binder
 import com.poketrader.data.CONDITIONS
 import com.poketrader.data.CardLinks
 import com.poketrader.data.CardRef
@@ -345,13 +346,22 @@ fun CardTile(
                 Box(Modifier.align(Alignment.TopStart).padding(4.dp)) { Tag(language, Color(0xFFBC002D), Color.White) }
             }
         }
+        // The price of one card; a stack's total goes underneath.
         Text(
-            Fmt.money(price?.let { it * quantity }),
+            Fmt.money(price),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 2.dp),
         )
         TrendBadge(trend)
+        if (quantity > 1) {
+            Text(
+                "×$quantity · ${Fmt.money(price?.let { it * quantity })}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
         Text(card.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (footnote != null) {
             Text(
@@ -487,6 +497,9 @@ data class EditValues(
     val condition: String,
     val language: String,
     val customPrice: Double?,
+    /** "My cards" only: the binder, and how many copies move there when it's changed. */
+    val binderId: Long = Binder.UNSORTED,
+    val move: Int = 0,
 )
 
 private data class VariantData(val printings: List<CardRef>, val prices: Map<Int, PriceEntity>)
@@ -512,6 +525,8 @@ fun CardDialog(
     onConfirm: (CardRef, EditValues) -> Unit,
     onDelete: (() -> Unit)? = null,
     onChangeCard: (() -> Unit)? = null,
+    /** With binders, the card (or some of its copies) can be moved to another binder. */
+    binders: List<Binder>? = null,
 ) {
     val c = LocalContext.current.container
     var selected by remember { mutableStateOf(card) }
@@ -581,7 +596,24 @@ fun CardDialog(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("How many", Modifier.weight(1f))
-                    if (enabled) QuantityStepper(v.quantity, { v = v.copy(quantity = it) }) else Text("${v.quantity}")
+                    if (enabled) QuantityStepper(v.quantity, { v = v.copy(quantity = it, move = minOf(v.move, it).coerceAtLeast(1)) }) else Text("${v.quantity}")
+                }
+                if (binders != null) {
+                    DropdownSelector(
+                        "Binder",
+                        v.binderId,
+                        listOf(Binder.UNSORTED) + binders.map { it.id },
+                        { binderName(it, binders) },
+                        { v = v.copy(binderId = it, move = v.quantity) },
+                        Modifier.fillMaxWidth(),
+                        enabled,
+                    )
+                    if (v.binderId != initial.binderId && v.quantity > 1) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Cards to move", Modifier.weight(1f))
+                            QuantityStepper(v.move.coerceIn(1, v.quantity), { v = v.copy(move = it.coerceAtMost(v.quantity)) })
+                        }
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DropdownSelector("Condition", v.condition, CONDITIONS.map { it.first }, { cd -> CONDITIONS.first { it.first == cd }.second }, { v = v.copy(condition = it) }, Modifier.weight(1f), enabled)

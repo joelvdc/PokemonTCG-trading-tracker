@@ -74,6 +74,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.poketrader.container
+import com.poketrader.data.Binder
+import com.poketrader.data.BinderChoice
 import com.poketrader.data.CardTarget
 import com.poketrader.data.ImageKey
 import com.poketrader.data.PriceType
@@ -388,15 +390,31 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
     if (confirmApply && t != null) {
         val getN = t.get.sumOf { it.quantity }
         val giveN = t.give.sumOf { it.quantity }
+        var binder by remember { mutableStateOf(BinderChoice()) }
         AlertDialog(
             onDismissRequest = { confirmApply = false },
             title = { Text("Did you swap the cards?") },
-            text = { Text("The $getN card(s) you got go into “My cards”, and the $giveN card(s) you gave are taken out.\n\nYou can undo this later.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "The $getN card(s) you got go into “My cards”, and the $giveN card(s) you gave are taken out " +
+                            "(from ${Binder.UNSORTED_NAME} first).\n\nYou can undo this later."
+                    )
+                    if (getN > 0) {
+                        BinderPicker(
+                            label = "Put the new cards in",
+                            choice = binder,
+                            onChange = { binder = it },
+                            suggestedName = if (t.trade.partner.isBlank()) "Trade ${Fmt.date(t.trade.createdAt)}" else "Trade with ${t.trade.partner}",
+                        )
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(enabled = binder.isValid, onClick = {
                     confirmApply = false
                     scope.launch {
-                        val missing = c.repo.applyTrade(tradeId)
+                        val missing = c.repo.applyTrade(tradeId, c.repo.resolve(binder))
                         snackbar.showSnackbar(
                             if (missing == 0) "Done! “My cards” is updated"
                             else "Done! ($missing given card(s) weren't in “My cards”)"

@@ -55,7 +55,7 @@ class AppContainer(context: Context) {
     val tcgplayerImages = TcgplayerImages(context, tcgdex)
     val network = NetworkMonitor(context)
     val prices = PriceGuideRepository(context, http, db, settings)
-    val repo = Repository(db, tcgdex, prices)
+    val repo = Repository(db, tcgdex, prices, appScope)
 
     /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
     @Volatile

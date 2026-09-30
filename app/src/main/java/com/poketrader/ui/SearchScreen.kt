@@ -58,6 +58,7 @@ import androidx.navigation.NavController
 import com.poketrader.AppContainer
 import com.poketrader.container
 import com.poketrader.data.CardRef
+import com.poketrader.data.Binder
 import com.poketrader.data.CardTarget
 import com.poketrader.data.ImageKey
 import com.poketrader.data.NumberFilter
@@ -68,10 +69,17 @@ import com.poketrader.scan.CardTextParser
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-fun targetLabel(t: CardTarget) = when (t) {
-    is CardTarget.TradeSide -> if (t.side == Side.GET) "Adding to: I get" else "Adding to: I give"
-    CardTarget.Collection -> "Adding to: My cards"
-    else -> "Choose the right card"
+/** "Adding to: …" for the search and scanner screens, naming the binder for "My cards" targets. */
+@Composable
+fun rememberTargetLabel(t: CardTarget): String {
+    val binders = rememberBinders()
+    return when (t) {
+        is CardTarget.TradeSide -> if (t.side == Side.GET) "Adding to: I get" else "Adding to: I give"
+        is CardTarget.Collection ->
+            if (t.binderId == Binder.UNSORTED) "Adding to: My cards" else "Adding to: ${binderName(t.binderId, binders)}"
+        CardTarget.Scans -> "Adding to: Scanned cards"
+        else -> "Choose the right card"
+    }
 }
 
 /** A search result with its set's name and printed size, ready to show. */
@@ -191,7 +199,7 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                 title = {
                     Column {
                         Text(if (target.isReplace) "Other card" else "Search")
-                        Text(targetLabel(target), style = MaterialTheme.typography.bodySmall)
+                        Text(rememberTargetLabel(target), style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
