@@ -5,7 +5,11 @@ trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up 
 
 | Trade | Search | Card | My cards |
 |:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="The collection"> |
+| <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="My cards as big card pictures"> |
+
+| My cards: list | My cards: compact |
+|:---:|:---:|
+| <img src="docs/screenshots/collection-list.png" width="200" alt="My cards as a list with small pictures, set, number and price"> | <img src="docs/screenshots/collection-compact.png" width="200" alt="My cards as one text line per card"> |
 
 ## Install
 Copy `PokeTrader-1.7.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
