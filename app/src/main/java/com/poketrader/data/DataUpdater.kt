@@ -85,7 +85,7 @@ class DataUpdater(
         private const val WORK_NAME = "cardmarket-update"
 
         /** Raise when a release improves how Cardmarket links are found, so saved cards get re-checked. */
-        const val CARD_LINKS_VERSION = 1
+        const val CARD_LINKS_VERSION = 2
     }
 }
 

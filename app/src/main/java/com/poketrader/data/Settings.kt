@@ -4,6 +4,17 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
+/** Ways to show "My cards": big card pictures (as before 1.7), a list with small pictures, or one text line per card. */
+enum class CollectionView(val label: String) {
+    CARDS("Cards (big pictures)"),
+    LIST("List"),
+    COMPACT("Compact (text only)");
+
+    companion object {
+        fun fromKey(key: String?) = entries.firstOrNull { it.name == key } ?: CARDS
+    }
+}
+
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
@@ -32,6 +43,15 @@ class Settings(context: Context) {
     /** Automatic updates only on Wi-Fi (or another unmetered connection). */
     private val _wifiOnly = MutableStateFlow(prefs.getBoolean("wifiOnly", false))
     val wifiOnly: StateFlow<Boolean> = _wifiOnly
+
+    /** How "My cards" shows the cards. Since 1.7. */
+    private val _collectionView = MutableStateFlow(CollectionView.fromKey(prefs.getString("collectionView", null)))
+    val collectionView: StateFlow<CollectionView> = _collectionView
+
+    fun setCollectionView(v: CollectionView) {
+        _collectionView.value = v
+        prefs.edit().putString("collectionView", v.name).apply()
+    }
 
     /** How far saved cards' Cardmarket links have been checked; see [Repository.repairSavedCards]. */
     var cardLinksVersion: Int

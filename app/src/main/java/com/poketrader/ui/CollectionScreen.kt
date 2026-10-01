@@ -3,15 +3,21 @@ package com.poketrader.ui
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -19,6 +25,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.ViewHeadline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.CameraAlt
@@ -61,7 +71,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,6 +83,8 @@ import com.poketrader.container
 import com.poketrader.data.Binder
 import com.poketrader.data.CardTarget
 import com.poketrader.data.CollectionRow
+import com.poketrader.data.CollectionView
+import com.poketrader.data.ImageKey
 import com.poketrader.data.CsvImportProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -86,6 +101,8 @@ fun CollectionScreen(nav: NavController) {
     val rows by remember { c.db.collectionDao().observeAll() }.collectAsStateWithLifecycle(null)
     val binders = rememberBinders()
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
+    val view by c.settings.collectionView.collectAsStateWithLifecycle()
+    var viewMenu by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(SortBy.NAME) }
     // null is "All", Binder.UNSORTED is cards outside binders.
@@ -141,6 +158,25 @@ fun CollectionScreen(nav: NavController) {
             TopAppBar(
                 title = { Text("My cards") },
                 actions = {
+                    IconButton(onClick = { viewMenu = true }) {
+                        Icon(
+                            when (view) {
+                                CollectionView.CARDS -> Icons.Default.GridView
+                                CollectionView.LIST -> Icons.AutoMirrored.Filled.ViewList
+                                CollectionView.COMPACT -> Icons.Default.ViewHeadline
+                            },
+                            "View",
+                        )
+                    }
+                    DropdownMenu(expanded = viewMenu, onDismissRequest = { viewMenu = false }) {
+                        CollectionView.entries.forEach { v ->
+                            DropdownMenuItem(
+                                text = { Text(v.label, fontWeight = if (v == view) FontWeight.Bold else null) },
+                                leadingIcon = { if (v == view) Icon(Icons.Default.Check, null) },
+                                onClick = { c.settings.setCollectionView(v); viewMenu = false },
+                            )
+                        }
+                    }
                     IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "Sort") }
                     DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                         SortBy.entries.forEach { s ->
@@ -291,7 +327,7 @@ fun CollectionScreen(nav: NavController) {
                     if (selected == Binder.UNSORTED) "No unsorted cards" else "This binder is empty",
                     "Scan or search cards while this binder is open, send scanned cards here from the Scan tab, or move cards in from another binder.",
                 )
-                else -> LazyVerticalGrid(
+                view == CollectionView.CARDS -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(104.dp),
                     contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 160.dp),
                 ) {
@@ -304,6 +340,16 @@ fun CollectionScreen(nav: NavController) {
                             trend = row.trend,
                             footnote = if (selected == null && row.item.binderId != Binder.UNSORTED) binderName(row.item.binderId, binders) else null,
                         ) { editing = row }
+                    }
+                }
+                else -> LazyColumn(
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 160.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (view == CollectionView.LIST) 6.dp else 0.dp),
+                ) {
+                    items(shown, key = { it.item.id }) { row ->
+                        val binder = if (selected == null && row.item.binderId != Binder.UNSORTED) binderName(row.item.binderId, binders) else null
+                        if (view == CollectionView.LIST) CollectionListRow(row, row.unitPrice(priceType), binder) { editing = row }
+                        else CompactRow(row, row.unitPrice(priceType), binder) { editing = row }
                     }
                 }
             }
@@ -374,6 +420,83 @@ fun CollectionScreen(nav: NavController) {
                 snackbar.showSnackbar("Binder “${b.name}” deleted")
             }
         }
+    }
+}
+
+/** A card in the list view: small picture, name, set and number, variant/language tags, price. */
+@Composable
+private fun CollectionListRow(row: CollectionRow, price: Double?, binder: String?, onClick: () -> Unit) {
+    val item = row.item
+    val card = item.card
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            CardImage(
+                card.thumbUrl,
+                Modifier.width(48.dp),
+                placeholder = card.name,
+                fallbackKey = ImageKey(card.cardId, card.dataLang, card.variantId),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    (if (item.quantity > 1) "${item.quantity}× " else "") + card.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${card.setName} · #${card.numberLabel}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    variantBadge(card)?.let { Tag(it, HoloColor, Color.White) }
+                    if (item.language != "EN") Tag(item.language, Color(0xFFBC002D), Color.White)
+                    if (item.condition != "NM") Tag(item.condition)
+                    binder?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(Fmt.money(price), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                if (item.quantity > 1) {
+                    Text(Fmt.money(price?.let { it * item.quantity }) + " total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TrendBadge(row.trend, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+/** A card as one line of text: quantity, name, set and number, tags and price. */
+@Composable
+private fun CompactRow(row: CollectionRow, price: Double?, binder: String?, onClick: () -> Unit) {
+    val item = row.item
+    val card = item.card
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("${item.quantity}×", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(30.dp))
+            Text(card.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 170.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                listOfNotNull(card.setName, "#${card.numberLabel}", variantBadge(card), item.language.takeIf { it != "EN" }, binder).joinToString(" · "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                Fmt.money(price),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.End,
+                modifier = Modifier.padding(start = 8.dp).widthIn(min = 64.dp),
+            )
+        }
+        HorizontalDivider(thickness = 0.5.dp)
     }
 }
 

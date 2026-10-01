@@ -32,7 +32,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -40,12 +40,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -109,7 +111,14 @@ data class ScannedEntry(
     val unitPrice: Double?,
     /** The card also exists as a jumbo print — the camera can't tell the size, so offer the switch. */
     val hasJumbo: Boolean = false,
-)
+    val condition: String = "NM",
+) {
+    /** How many copies this line added. */
+    val quantity get() = result.copies
+}
+
+/** A recognised card waiting for "Add" (when auto-add is off). */
+data class PendingScan(val card: TcgCard, val dataLang: String, val language: String?)
 
 /**
  * Drives recognition: a card is added once it has been identified on two consecutive reads, and the
@@ -124,6 +133,8 @@ class ScanController(
     private val recognizer = CardRecognizer(c.tcgdex, c.sets)
     var status by mutableStateOf("Hold a card inside the frame")
     var holo by mutableStateOf(false)
+    var autoAdd by mutableStateOf(true)
+    var pending by mutableStateOf<PendingScan?>(null)
     var choose by mutableStateOf<ScanResult.Choose?>(null)
     val added = mutableStateListOf<ScannedEntry>()
     var onAdded: () -> Unit = {}
@@ -169,12 +180,15 @@ class ScanController(
                     hits = 1
                 }
                 if (hits < 2 || key == lastAddedKey) {
-                    if (key == lastAddedKey) status = "Added! Show the next card 👍"
+                    if (key == lastAddedKey && autoAdd) status = "Added! Show the next card 👍"
                     return@launch
                 }
                 lastAddedKey = key
                 when (result) {
-                    is ScanResult.Found -> add(result.card, result.dataLang, result.language)
+                    is ScanResult.Found -> if (autoAdd) add(result.card, result.dataLang, result.language) else {
+                        pending = PendingScan(result.card, result.dataLang, result.language)
+                        status = "Found ${result.card.name} — tap Add"
+                    }
                     is ScanResult.Choose -> {
                         choose = result
                         status = "Which ${result.name} is it?"
@@ -195,8 +209,25 @@ class ScanController(
         val result = c.repo.add(target, ref, lang, hasJumbo = hasJumbo) ?: return
         val price = c.repo.snapshot(ref).best(PriceType.TREND) ?: ref.fallbackPrice
         added.add(0, ScannedEntry(ref, lang, result, price, hasJumbo = hasJumbo))
+        pending = null
         status = "Added ${card.name}!"
         onAdded()
+    }
+
+    /** One more copy of a card already scanned (its own line, so it can be undone on its own). */
+    fun addAgain(e: ScannedEntry) = scope.launch {
+        val result = c.repo.add(target, e.card, e.language, 1, e.condition, e.hasJumbo) ?: return@launch
+        added.add(0, e.copy(result = result))
+        onAdded()
+    }
+
+    /** Saves what was changed on a scanned card: the printing, condition, language and number of copies. */
+    fun change(e: ScannedEntry, card: CardRef, condition: String, language: String, quantity: Int) = scope.launch {
+        val result = c.repo.changeAdded(e.result, target, card, condition, language, quantity, e.hasJumbo) ?: return@launch
+        val price = c.repo.snapshot(card).best(PriceType.TREND) ?: card.fallbackPrice
+        val i = added.indexOf(e)
+        val updated = e.copy(card = card, language = language, condition = condition, result = result, unitPrice = price)
+        if (i >= 0) added[i] = updated else added.add(0, updated)
     }
 
     fun pick(candidateId: String) {
@@ -219,10 +250,6 @@ class ScanController(
         lastAddedKey = null
     }
 
-    fun replace(old: ScannedEntry, card: CardRef, language: String) {
-        val i = added.indexOf(old)
-        if (i >= 0) added[i] = old.copy(card = card, language = language)
-    }
 }
 
 @Composable
@@ -295,10 +322,11 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FilterChip(selected = controller.holo, onClick = { controller.holo = !controller.holo }, label = { Text("✨ Shiny (holo)") })
+                FilterChip(selected = controller.holo, onClick = { controller.holo = !controller.holo }, label = { Text("✨ Holo") })
+                FilterChip(selected = controller.autoAdd, onClick = { controller.autoAdd = !controller.autoAdd }, label = { Text("Auto-add") })
                 Text(
                     controller.status,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -306,37 +334,30 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                     textAlign = TextAlign.End,
                 )
             }
-            if (controller.added.isNotEmpty()) {
-                Text(
-                    "Tap a card to change it",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-                )
+            controller.pending?.let { p ->
+                Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CardImage(p.card.defaultPrinting(p.dataLang, controller.holo).thumbUrl, Modifier.width(44.dp), fallbackKey = ImageKey(p.card.id, p.dataLang))
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(p.card.name, style = MaterialTheme.typography.titleSmall)
+                            Text("${p.card.set.name} · #${p.card.localId}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(onClick = { scope.launch { controller.add(p.card, p.dataLang, p.language) } }) { Text("Add") }
+                    }
+                }
             }
-            LazyRow(
+            LazyColumn(
+                Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(controller.added, key = { System.identityHashCode(it) }) { e ->
-                    Column(Modifier.width(88.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.clickable { editing = e }) { CardImage(e.card.thumbUrl, Modifier.fillMaxWidth(), fallbackKey = ImageKey(e.card.cardId, e.card.dataLang, e.card.variantId)) }
-                        Text(Fmt.money(e.unitPrice), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                        if (e.hasJumbo && !e.card.oversized) {
-                            Text(
-                                "Big card? Tap it",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable { editing = e },
-                            )
-                        }
-                        IconButton(onClick = { controller.undo(e) }) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-                    }
+                    ScannedRow(e, onClick = { editing = e }, onAddAgain = { controller.addAgain(e) }, onUndo = { controller.undo(e) })
                 }
             }
         }
     }
-
     controller.choose?.let { ch ->
         AlertDialog(
             onDismissRequest = { controller.dismissChoice() },
@@ -360,19 +381,59 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
     editing?.let { e ->
         CardDialog(
             card = e.card,
-            initial = EditValues(1, "NM", e.language, null),
+            initial = EditValues(e.quantity, e.condition, e.language, null),
             priceType = priceType,
             confirmLabel = "Save",
             allowCustomPrice = false,
             onDismiss = { editing = null },
             onConfirm = { card, v ->
                 editing = null
-                scope.launch {
-                    c.repo.changeAdded(e.result, card, v.condition, v.language)
-                    controller.replace(e, card, v.language)
-                }
+                controller.change(e, card, v.condition, v.language, v.quantity)
             },
         )
+    }
+}
+
+/** One scanned card: picture, name, set and variant, price, and buttons for another copy or undo. Tap to change it. */
+@Composable
+private fun ScannedRow(e: ScannedEntry, onClick: () -> Unit, onAddAgain: () -> Unit, onUndo: () -> Unit) {
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            CardImage(e.card.thumbUrl, Modifier.width(40.dp), fallbackKey = ImageKey(e.card.cardId, e.card.dataLang, e.card.variantId))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    (if (e.quantity > 1) "${e.quantity}× " else "") + e.card.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${e.card.setName} · #${e.card.numberLabel}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    variantBadge(e.card)?.let { Tag(it, HoloColor, Color.White) }
+                    if (e.language != "EN") Tag(e.language, Color(0xFFBC002D), Color.White)
+                    if (e.condition != "NM") Tag(e.condition)
+                    if (e.hasJumbo && !e.card.oversized) {
+                        Text("Big card? Tap it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(Fmt.money(e.unitPrice), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                if (e.quantity > 1) {
+                    Text(Fmt.money(e.unitPrice?.let { it * e.quantity }) + " total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            IconButton(onClick = onAddAgain) { Icon(Icons.Default.Add, "Add another copy") }
+            IconButton(onClick = onUndo) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
+        }
     }
 }
 

@@ -49,8 +49,8 @@ sealed interface CardTarget {
 
 enum class AddedTo { TRADE, COLLECTION, SCANS }
 
-/** Identifies one added copy so the scanner can undo or change it. */
-data class AddResult(val itemId: Long, val addedTo: AddedTo)
+/** Identifies the [copies] just added to a stack, so the scanner can undo or change them. */
+data class AddResult(val itemId: Long, val addedTo: AddedTo, val copies: Int = 1)
 
 data class ImportResult(val imported: Int, val notFound: Int)
 
@@ -101,38 +101,43 @@ class Repository(
         val existing = trades.findSame(tradeId, side, card.cardId, card.dataLang, card.variantId, language)
         if (existing != null) {
             trades.updateItem(existing.copy(quantity = existing.quantity + qty))
-            return AddResult(existing.id, AddedTo.TRADE)
+            return AddResult(existing.id, AddedTo.TRADE, qty)
         }
         val id = trades.insertItem(
             TradeItem(tradeId = tradeId, side = side, card = card, condition = condition, language = language, quantity = qty, prices = snapshot(card))
         )
-        return AddResult(id, AddedTo.TRADE)
+        return AddResult(id, AddedTo.TRADE, qty)
     }
 
+    /** Takes back the copies [r] added (the rest of the stack stays). */
     suspend fun undoAdd(r: AddResult) {
+        val n = r.copies
         when (r.addedTo) {
             AddedTo.TRADE -> {
                 val item = trades.item(r.itemId) ?: return
-                if (item.quantity > 1) trades.updateItem(item.copy(quantity = item.quantity - 1)) else trades.deleteItem(item.id)
+                if (item.quantity > n) trades.updateItem(item.copy(quantity = item.quantity - n)) else trades.deleteItem(item.id)
             }
             AddedTo.COLLECTION -> {
                 val item = coll.byId(r.itemId) ?: return
-                if (item.quantity > 1) coll.update(item.copy(quantity = item.quantity - 1)) else coll.deleteById(item.id)
+                if (item.quantity > n) coll.update(item.copy(quantity = item.quantity - n)) else coll.deleteById(item.id)
             }
             AddedTo.SCANS -> {
                 val item = scans.byId(r.itemId) ?: return
-                if (item.quantity > 1) scans.update(item.copy(quantity = item.quantity - 1)) else scans.delete(item.id)
+                if (item.quantity > n) scans.update(item.copy(quantity = item.quantity - n)) else scans.delete(item.id)
             }
         }
     }
 
-    /** Changes the card, condition and language of a copy the scanner just added (tap on a scanned card). */
-    suspend fun changeAdded(r: AddResult, card: CardRef, condition: String, language: String) {
-        when (r.addedTo) {
-            AddedTo.TRADE -> trades.item(r.itemId)?.let { updateTradeItem(it.copy(card = card, language = language, condition = condition)) }
-            AddedTo.COLLECTION -> coll.byId(r.itemId)?.let { updateCollectionItem(it.copy(card = card, language = language, condition = condition)) }
-            AddedTo.SCANS -> scans.byId(r.itemId)?.let { updateScan(it.copy(card = card, language = language, condition = condition)) }
-        }
+    /**
+     * Changes what the scanner just added (tap on a scanned card): the copies [r] added are taken
+     * back and [quantity] copies of [card] in that condition and language are added instead, so
+     * they land in the right stack. Returns what was added now.
+     */
+    suspend fun changeAdded(
+        r: AddResult, target: CardTarget, card: CardRef, condition: String, language: String, quantity: Int, hasJumbo: Boolean = false,
+    ): AddResult? = db.withTransaction {
+        undoAdd(r)
+        add(target, card, language, quantity.coerceAtLeast(1), condition, hasJumbo)
     }
 
     /** Saves an edited item; re-reads its prices if the variant changed. */
@@ -225,10 +230,10 @@ class Repository(
         val existing = coll.find(card.cardId, card.dataLang, card.variantId, condition, language, binderId)
         if (existing != null) {
             coll.update(existing.copy(quantity = existing.quantity + qty, card = card))
-            return AddResult(existing.id, AddedTo.COLLECTION)
+            return AddResult(existing.id, AddedTo.COLLECTION, qty)
         }
         val id = coll.insert(CollectionItem(card = card, condition = condition, language = language, quantity = qty, binderId = binderId))
-        return AddResult(id, AddedTo.COLLECTION)
+        return AddResult(id, AddedTo.COLLECTION, qty)
     }
 
     private data class Removal(val removed: Int, val fromBinder: Long)
@@ -345,10 +350,10 @@ class Repository(
         val existing = scans.find(card.cardId, card.dataLang, card.variantId, condition, language)
         if (existing != null) {
             scans.update(existing.copy(quantity = existing.quantity + qty, scannedAt = System.currentTimeMillis()))
-            return AddResult(existing.id, AddedTo.SCANS)
+            return AddResult(existing.id, AddedTo.SCANS, qty)
         }
         val id = scans.insert(ScannedCard(card = card, condition = condition, language = language, quantity = qty, hasJumbo = hasJumbo))
-        return AddResult(id, AddedTo.SCANS)
+        return AddResult(id, AddedTo.SCANS, qty)
     }
 
     /** Saves an edited scan, merging it into an identical one if there is one. */

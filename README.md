@@ -8,9 +8,9 @@ trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up 
 | <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="The collection"> |
 
 ## Install
-Copy `PokeTrader-1.6.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.7.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.6-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.7-universal.apk` instead (bigger, runs on any device).
 
 ## Binders
 "My cards" can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
@@ -20,9 +20,16 @@ binder. "We traded!" asks which binder the new cards go into (or makes a new one
 Unsorted first. The CSV backup keeps each card's binder. Card tiles show the price of one card, with the total for a
 stack underneath ("×4 · €80.00"), and "Most valuable" sorts by that single-card price.
 
+"My cards" can be shown as **cards** (big pictures, the default), a **list** (small picture, set and number, tags and
+price) or **compact** (one text line per card); pick it with the view button next to Sort.
+
 ## Scan tab
 Scan a pile of cards (or add them by name) into a waiting list, then select some or all of them and send them **to a
 binder** or **to a trade**, or **discard** them.
+
+While scanning, every card that's added shows up in a list under the camera with its price: **+** adds another copy,
+the undo arrow takes it back, and tapping it lets you change the version, condition, language and **number of copies**.
+Turn **Auto-add** off to confirm each recognised card with an "Add" button first.
 
 ## Where the data comes from (no app updates needed for new sets)
 - **Cards, pictures, names in all languages:** [TCGdex](https://tcgdex.net) (free, open API), looked up live.
@@ -36,7 +43,9 @@ binder** or **to a trade**, or **discard** them.
   to fill in cards TCGdex doesn't link, and to replace links that point to another card (Gym Heroes' "Erika's …"
   cards → "Erika", Hidden Fates' Charizard GX 9/68 → the shiny one). A link is only replaced when a product with the
   same name and a matching attack is found in the card's set. Plain versions without their own link use the link
-  TCGdex has for the card as a whole. Japanese cards (Japanese names) can't be matched this way.
+  TCGdex has for the card as a whole. Stamped versions are separate products on Cardmarket, except for cards that only
+  exist stamped (e.g. the Wizards promos handed out with the first movie, "1st Movie" / "1st Movie inverted" stamp):
+  those use the card's one Cardmarket product. Japanese cards (Japanese names) can't be matched this way.
 - **Updates:** automatic by default (on opening the app and in the background); Settings can turn them off or limit
   them to Wi-Fi. "Update now" always runs.
 - **Pokémon TCG Pocket** (the phone game) cards are in TCGdex too; they're filtered out everywhere since they don't
@@ -57,7 +66,7 @@ binder** or **to a trade**, or **discard** them.
   camera can't tell size, so a scanned card is added as standard size with a "Big card? Tap it" hint when a jumbo
   version exists. Jumbo cards TCGdex doesn't list can't be added.
 - The scanner identifies cards mainly by the printed number ("025/165") plus the name. Holo vs reverse holo can't be
-  seen by the camera: use the "✨ Shiny" toggle or tap a scanned card to change its version.
+  seen by the camera: use the "✨ Holo" toggle or tap a scanned card to change its version.
 
 ## Rebuilding
 Same toolchain as the MTG Trader app next door: JDK 17+ and the Android SDK at `%USERPROFILE%\Android\sdk`.
@@ -72,7 +81,8 @@ Bump `versionCode`/`versionName` in `app/build.gradle.kts` for each new release.
 over the existing app if it's signed with the same key; losing it means uninstalling (and losing the app's data).
 
 Tests: `gradlew testDebugUnitTest` (logic, parser, variants) and `gradlew connectedDebugAndroidTest` (real OCR on six
-card images in `app/src/androidTest/assets`, needs a device/emulator with internet).
+card images in `app/src/androidTest/assets`, needs a device/emulator with internet; plus editing scanned cards against
+an in-memory database).
 
 ## Code map
 - `data/Tcgdex.kt` – TCGdex client, variant naming, card → printings.

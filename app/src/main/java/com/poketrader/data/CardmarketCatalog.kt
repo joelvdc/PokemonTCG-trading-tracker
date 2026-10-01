@@ -287,6 +287,10 @@ class CardmarketCatalog(
      * Checks each variant's Cardmarket link: a missing link on a plain variant, or a link to a
      * product with another name, is looked up in the card's expansion. A link is only replaced
      * when the right product is found with confidence. Japanese cards (Japanese names) are left as they are.
+     *
+     * Stamped variants are usually separate products and stay as they are, except when every
+     * variant of the card is stamped (e.g. the Wizards promos handed out with the first movie,
+     * "1st Movie" and "1st Movie inverted"): then the card's one Cardmarket product is theirs.
      */
     suspend fun repair(card: TcgCard, lang: String): TcgCard {
         if (lang == "ja" || !hasList()) return card
@@ -296,10 +300,14 @@ class CardmarketCatalog(
         val fixes = HashMap<String, CardmarketFix>()
         var lookedUp = false
         var found: Int? = null
+        // Standard-size prints without a special foil; when none of them is plain, they're all stamped.
+        fun standard(v: TcgVariant) = !v.isOversized && v.foil == null
+        val allStamped = links.any { standard(it.first) } && links.none { (v, _) -> standard(v) && card.isPlain(v) }
         for ((variant, linked) in links) {
             val product = linked?.let { products[it] }
             val wrong = product != null && !CatalogMatch.isThisCard(card.name, attacks, product.name)
-            if (!(linked == null || wrong) || !card.isPlain(variant)) continue
+            val eligible = card.isPlain(variant) || (allStamped && standard(variant))
+            if (!(linked == null || wrong) || !eligible) continue
             if (!lookedUp) {
                 lookedUp = true
                 val expansion = expansionFor(card, lang, products.values)
