@@ -1,5 +1,11 @@
 package com.poketrader.ui
 
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.heightIn
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -532,9 +538,13 @@ fun CardDialog(
     var selected by remember { mutableStateOf(card) }
     var v by remember { mutableStateOf(initial) }
     var customText by remember { mutableStateOf(initial.customPrice?.let { "%.2f".format(it) } ?: "") }
-    val data by produceState<VariantData?>(null, card.cardId, card.dataLang) {
-        val printings = runCatching { c.tcgdex.card(card.cardId, card.dataLang)?.printings(card.dataLang) }.getOrNull()
-            ?.takeIf { it.isNotEmpty() } ?: listOf(card)
+    var pickingPrinting by remember { mutableStateOf(false) }
+    // The versions of the card shown: reloaded when another printing (set/number) is picked.
+    val data by produceState<VariantData?>(null, selected.cardId, selected.dataLang) {
+        value = null
+        val shown = selected
+        val printings = runCatching { c.tcgdex.card(shown.cardId, shown.dataLang)?.printings(shown.dataLang) }.getOrNull()
+            ?.takeIf { it.isNotEmpty() } ?: listOf(shown)
         value = VariantData(printings, c.prices.pricesFor(printings.mapNotNull { it.cardmarketId }))
     }
 
@@ -569,10 +579,17 @@ fun CardDialog(
                     )
                 }
                 val d = data
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if ((d?.printings?.size ?: 0) > 1) "Which version?" else "Printing",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { pickingPrinting = true }, enabled = enabled) { Text("Other printing…") }
+                }
                 if (d == null) {
                     CircularProgressIndicator(Modifier.size(24.dp))
                 } else if (d.printings.size > 1) {
-                    Text("Which version?", style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         d.printings.forEach { p ->
                             FilterChip(
@@ -645,9 +662,12 @@ fun CardDialog(
                     Text(if (selected.cardmarketId != null) "See on Cardmarket" else "Search on Cardmarket")
                 }
             }
+            if (pickingPrinting) {
+                PrintingPickerDialog(selected, onPick = { selected = it; pickingPrinting = false }, onDismiss = { pickingPrinting = false })
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selected, v) }, enabled = enabled) { Text(confirmLabel) }
+            TextButton(onClick = { onConfirm(selected, v) }, enabled = enabled && data != null) { Text(confirmLabel) }
         },
         dismissButton = {
             Row {
@@ -657,6 +677,63 @@ fun CardDialog(
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
+    )
+}
+
+/**
+ * Every printing of a card (same name: other sets, promos, numbers), as pictures to pick from.
+ * Picking one hands back its default version (holo if the current one is holo and it has one).
+ */
+@Composable
+fun PrintingPickerDialog(current: CardRef, onPick: (CardRef) -> Unit, onDismiss: () -> Unit) {
+    val c = LocalContext.current.container
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
+    val hits by produceState<List<Hit>?>(null, current.name, current.dataLang) {
+        value = runCatching { toHits(c, c.tcgdex.cardsNamed(current.name, current.dataLang), current.dataLang) }.getOrDefault(emptyList())
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Which ${current.name}?") },
+        text = {
+            val list = hits
+            when {
+                list == null || loading -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                list.isEmpty() -> Text("No other printings found.")
+                else -> LazyVerticalGrid(columns = GridCells.Adaptive(96.dp), modifier = Modifier.heightIn(max = 480.dp)) {
+                    items(list, key = { it.brief.id }) { hit ->
+                        val isCurrent = hit.brief.id == current.cardId
+                        Column(
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                                .clickable {
+                                    loading = true
+                                    scope.launch {
+                                        val card = runCatching { c.tcgdex.card(hit.brief.id, hit.dataLang) }.getOrNull()
+                                        loading = false
+                                        val holo = current.variantLabel.contains("Holo", ignoreCase = true) && !current.variantLabel.startsWith("Reverse")
+                                        card?.defaultPrinting(hit.dataLang, preferHolo = holo)?.let(onPick)
+                                    }
+                                }
+                                .padding(4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            CardImage(
+                                hit.brief.thumbUrl(hit.dataLang),
+                                Modifier.fillMaxWidth(),
+                                fallbackKey = ImageKey(hit.brief.id, hit.dataLang),
+                                placeholder = hit.brief.name + "\n#" + hit.brief.localId,
+                            )
+                            Text(hit.setName, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis)
+                            Text("#${hit.brief.localId}", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

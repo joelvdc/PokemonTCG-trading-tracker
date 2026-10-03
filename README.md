@@ -12,9 +12,9 @@ trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up 
 | <img src="docs/screenshots/collection-list.png" width="200" alt="My cards as a list with small pictures, set, number and price"> | <img src="docs/screenshots/collection-compact.png" width="200" alt="My cards as one text line per card"> |
 
 ## Install
-Copy `PokeTrader-1.7.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.8.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.7-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.8-universal.apk` instead (bigger, runs on any device).
 
 ## Binders
 "My cards" can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
@@ -33,6 +33,8 @@ binder** or **to a trade**, or **discard** them.
 
 While scanning, every card that's added shows up in a list under the camera with its price: **+** adds another copy,
 the undo arrow takes it back, and tapping it lets you change the version, condition, language and **number of copies**.
+Prices follow the price type chosen in Settings. Every card window has **Other printing…**, which shows all printings
+of the card (other sets, promos, numbers) as pictures to pick from.
 Turn **Auto-add** off to confirm each recognised card with an "Add" button first.
 
 ## Where the data comes from (no app updates needed for new sets)

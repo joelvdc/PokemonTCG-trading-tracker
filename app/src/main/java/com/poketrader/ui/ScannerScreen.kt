@@ -92,6 +92,7 @@ import com.poketrader.data.AddResult
 import com.poketrader.data.CardRef
 import com.poketrader.data.CardTarget
 import com.poketrader.data.ImageKey
+import com.poketrader.data.PriceSet
 import com.poketrader.data.PriceType
 import com.poketrader.data.TcgCard
 import com.poketrader.scan.CardRecognizer
@@ -108,13 +109,16 @@ data class ScannedEntry(
     val card: CardRef,
     val language: String,
     val result: AddResult,
-    val unitPrice: Double?,
+    /** Its Cardmarket prices; the list shows the one chosen in Settings. */
+    val prices: PriceSet,
     /** The card also exists as a jumbo print — the camera can't tell the size, so offer the switch. */
     val hasJumbo: Boolean = false,
     val condition: String = "NM",
 ) {
     /** How many copies this line added. */
     val quantity get() = result.copies
+
+    fun unitPrice(type: PriceType): Double? = prices.best(type) ?: card.fallbackPrice
 }
 
 /** A recognised card waiting for "Add" (when auto-add is off). */
@@ -207,8 +211,7 @@ class ScanController(
         val lang = language ?: if (dataLang == "ja") "JA" else "EN"
         val hasJumbo = printings.any { it.oversized }
         val result = c.repo.add(target, ref, lang, hasJumbo = hasJumbo) ?: return
-        val price = c.repo.snapshot(ref).best(PriceType.TREND) ?: ref.fallbackPrice
-        added.add(0, ScannedEntry(ref, lang, result, price, hasJumbo = hasJumbo))
+        added.add(0, ScannedEntry(ref, lang, result, c.repo.snapshot(ref), hasJumbo = hasJumbo))
         pending = null
         status = "Added ${card.name}!"
         onAdded()
@@ -224,9 +227,8 @@ class ScanController(
     /** Saves what was changed on a scanned card: the printing, condition, language and number of copies. */
     fun change(e: ScannedEntry, card: CardRef, condition: String, language: String, quantity: Int) = scope.launch {
         val result = c.repo.changeAdded(e.result, target, card, condition, language, quantity, e.hasJumbo) ?: return@launch
-        val price = c.repo.snapshot(card).best(PriceType.TREND) ?: card.fallbackPrice
         val i = added.indexOf(e)
-        val updated = e.copy(card = card, language = language, condition = condition, result = result, unitPrice = price)
+        val updated = e.copy(card = card, language = language, condition = condition, result = result, prices = c.repo.snapshot(card))
         if (i >= 0) added[i] = updated else added.add(0, updated)
     }
 
@@ -353,7 +355,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(controller.added, key = { System.identityHashCode(it) }) { e ->
-                    ScannedRow(e, onClick = { editing = e }, onAddAgain = { controller.addAgain(e) }, onUndo = { controller.undo(e) })
+                    ScannedRow(e, e.unitPrice(priceType), onClick = { editing = e }, onAddAgain = { controller.addAgain(e) }, onUndo = { controller.undo(e) })
                 }
             }
         }
@@ -396,7 +398,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
 
 /** One scanned card: picture, name, set and variant, price, and buttons for another copy or undo. Tap to change it. */
 @Composable
-private fun ScannedRow(e: ScannedEntry, onClick: () -> Unit, onAddAgain: () -> Unit, onUndo: () -> Unit) {
+private fun ScannedRow(e: ScannedEntry, price: Double?, onClick: () -> Unit, onAddAgain: () -> Unit, onUndo: () -> Unit) {
     Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
             CardImage(e.card.thumbUrl, Modifier.width(40.dp), fallbackKey = ImageKey(e.card.cardId, e.card.dataLang, e.card.variantId))
@@ -426,9 +428,9 @@ private fun ScannedRow(e: ScannedEntry, onClick: () -> Unit, onAddAgain: () -> U
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(Fmt.money(e.unitPrice), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Text(Fmt.money(price), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 if (e.quantity > 1) {
-                    Text(Fmt.money(e.unitPrice?.let { it * e.quantity }) + " total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(Fmt.money(price?.let { it * e.quantity }) + " total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             IconButton(onClick = onAddAgain) { Icon(Icons.Default.Add, "Add another copy") }
