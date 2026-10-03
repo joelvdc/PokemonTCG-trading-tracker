@@ -12,9 +12,9 @@ trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up 
 | <img src="docs/screenshots/collection-list.png" width="200" alt="My cards as a list with small pictures, set, number and price"> | <img src="docs/screenshots/collection-compact.png" width="200" alt="My cards as one text line per card"> |
 
 ## Install
-Copy `PokeTrader-1.8.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.9.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.8-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.9-universal.apk` instead (bigger, runs on any device).
 
 ## Binders
 "My cards" can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
@@ -25,7 +25,23 @@ Unsorted first. The CSV backup keeps each card's binder. Card tiles show the pri
 stack underneath ("×4 · €80.00"), and "Most valuable" sorts by that single-card price.
 
 "My cards" can be shown as **cards** (big pictures, the default), a **list** (small picture, set and number, tags and
-price) or **compact** (one text line per card); pick it with the view button next to Sort.
+price) or **compact** (one text line per card); pick it with the view button next to Sort. Every sort can be
+reversed (A to Z / Z to A, most valuable / cheapest first, newest / oldest first).
+
+Tap a card to add **notes** and **what you paid** per card; the card then shows what you paid against what it's worth
+now. Both are kept in the CSV backup.
+
+**Value over time:** tap the total above the cards (or ⋮ → Value over time). The app saves the collection's value once
+a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately.
+
+## Wishlist
+The **★ Wishlist** in the binder bar holds the cards you want: pick it, then scan or search them. Any version of the card
+counts unless you limit it to one (e.g. only the reverse holo). Each card shows whether you have it, "Remove the cards I
+got since adding them" (⋮ menu) clears what you've got since, and cards on the wishlist show "★ on your wishlist" on the
+"I get" side of a trade. The wishlist can be shared as a list and isn't counted in the collection's value.
+
+## Appearance
+Settings → **Appearance**: same as the phone, light or dark.
 
 ## Scan tab
 Scan a pile of cards (or add them by name) into a waiting list, then select some or all of them and send them **to a
@@ -36,6 +52,11 @@ the undo arrow takes it back, and tapping it lets you change the version, condit
 Prices follow the price type chosen in Settings. Every card window has **Other printing…**, which shows all printings
 of the card (other sets, promos, numbers) as pictures to pick from.
 Turn **Auto-add** off to confirm each recognised card with an "Add" button first.
+
+**✨ Holo:** with "Let the camera tell" (the default) the scanner looks at how the card shines when a card comes both
+with and without foil: a glittering text box means reverse holo, artwork that flickers as the card moves means holo. It
+says so on the card ("Looks like a reverse holo · tap if not"); tap to pick another version. "Not holo" and "Holo or
+reverse holo" set it by hand, as before.
 
 ## Where the data comes from (no app updates needed for new sets)
 - **Cards, pictures, names in all languages:** [TCGdex](https://tcgdex.net) (free, open API), looked up live.

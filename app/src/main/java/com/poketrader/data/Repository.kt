@@ -20,6 +20,8 @@ sealed interface CardTarget {
     data class ReplaceTradeItem(val itemId: Long) : CardTarget
     data class ReplaceCollectionItem(val itemId: Long) : CardTarget
     data class ReplaceScan(val itemId: Long) : CardTarget
+    /** The wishlist (cards you want). Since 1.9. */
+    data object Wishlist : CardTarget
 
     val isReplace get() = this is ReplaceTradeItem || this is ReplaceCollectionItem || this is ReplaceScan
 
@@ -30,6 +32,7 @@ sealed interface CardTarget {
         is ReplaceTradeItem -> "rtrade:$itemId"
         is ReplaceCollectionItem -> "rcoll:$itemId"
         is ReplaceScan -> "rscan:$itemId"
+        Wishlist -> "wishlist"
     }
 
     companion object {
@@ -41,13 +44,14 @@ sealed interface CardTarget {
                 "rtrade" -> ReplaceTradeItem(p[1].toLong())
                 "rcoll" -> ReplaceCollectionItem(p[1].toLong())
                 "rscan" -> ReplaceScan(p[1].toLong())
+                "wishlist" -> Wishlist
                 else -> Collection(p.getOrNull(1)?.toLongOrNull() ?: Binder.UNSORTED)
             }
         }
     }
 }
 
-enum class AddedTo { TRADE, COLLECTION, SCANS }
+enum class AddedTo { TRADE, COLLECTION, SCANS, WISHLIST }
 
 /** Identifies the [copies] just added to a stack, so the scanner can undo or change them. */
 data class AddResult(val itemId: Long, val addedTo: AddedTo, val copies: Int = 1)
@@ -70,6 +74,7 @@ class Repository(
     private val coll = db.collectionDao()
     private val binders = db.binderDao()
     private val scans = db.scanDao()
+    private val wishlist = db.wishlistDao()
 
     // ---- trades --------------------------------------------------------------------------
 
@@ -94,6 +99,7 @@ class Repository(
         is CardTarget.TradeSide -> addToTrade(target.tradeId, target.side, card, language, qty, condition)
         is CardTarget.Collection -> addToCollection(card, condition, language, qty, target.binderId)
         CardTarget.Scans -> addToScans(card, condition, language, qty, hasJumbo)
+        CardTarget.Wishlist -> addToWishlist(card, qty)
         else -> null
     }
 
@@ -125,7 +131,68 @@ class Repository(
                 val item = scans.byId(r.itemId) ?: return
                 if (item.quantity > n) scans.update(item.copy(quantity = item.quantity - n)) else scans.delete(item.id)
             }
+            AddedTo.WISHLIST -> {
+                val item = wishlist.byId(r.itemId) ?: return
+                if (item.quantity > n) wishlist.update(item.copy(quantity = item.quantity - n)) else wishlist.delete(item.id)
+            }
         }
+    }
+
+    // ---- wishlist ------------------------------------------------------------------------
+
+    /** Adds [qty] wanted copies: to the entry for that card (or that exact variant, if the entry wants only it). */
+    suspend fun addToWishlist(card: CardRef, qty: Int = 1): AddResult {
+        val same = wishlist.byCard(card.cardId, card.dataLang).firstOrNull { it.anyVariant || it.card.variantId == card.variantId }
+        if (same != null) {
+            wishlist.update(same.copy(quantity = same.quantity + qty))
+            return AddResult(same.id, AddedTo.WISHLIST, qty)
+        }
+        val item = WishlistItem(card = card, quantity = qty)
+        return AddResult(wishlist.insert(item.copy(ownedAtAdd = ownedFor(item, coll.all()))), AddedTo.WISHLIST, qty)
+    }
+
+    suspend fun updateWishlistItem(item: WishlistItem) = wishlist.update(item)
+
+    suspend fun deleteWishlistItem(id: Long) = wishlist.delete(id)
+
+    suspend fun restoreWishlistItem(item: WishlistItem) {
+        if (wishlist.byId(item.id) == null) wishlist.insert(item)
+    }
+
+    /** Copies of the entry's card in [all]: any variant, or only that variant. */
+    private fun ownedFor(w: WishlistItem, all: List<CollectionItem>) =
+        all.filter { it.card.cardId == w.card.cardId && it.card.dataLang == w.card.dataLang && (w.anyVariant || it.card.variantId == w.card.variantId) }
+            .sumOf { it.quantity }
+
+    /** Each wishlist entry against "My cards". */
+    fun wishlistOwned(items: List<WishlistItem>, collection: List<CollectionItem>): Map<Long, WishlistOwned> =
+        items.associate { w ->
+            val owned = ownedFor(w, collection)
+            w.id to WishlistOwned(owned, (owned - w.ownedAtAdd).coerceAtLeast(0))
+        }
+
+    /** Takes off the wishlist the copies you got since adding them. Returns the copies taken off and an undo. */
+    suspend fun removeOwnedFromWishlist(): Pair<Int, UndoAction> {
+        val before = wishlist.all()
+        val removed = db.withTransaction {
+            val owned = wishlistOwned(before, coll.all())
+            var n = 0
+            for (w in before) {
+                val got = owned[w.id]?.gotSince ?: 0
+                if (got <= 0) continue
+                if (got >= w.quantity) wishlist.delete(w.id)
+                else wishlist.update(w.copy(quantity = w.quantity - got, ownedAtAdd = w.ownedAtAdd + got))
+                n += minOf(got, w.quantity)
+            }
+            n
+        }
+        val undo: UndoAction = {
+            db.withTransaction {
+                val now = wishlist.all().associateBy { it.id }
+                for (w in before) if (now[w.id] == null) wishlist.insert(w) else if (now[w.id] != w) wishlist.update(w)
+            }
+        }
+        return removed to undo
     }
 
     /**
@@ -452,7 +519,7 @@ class Repository(
 
     private val collectionHeader = listOf(
         "Name", "Set", "Number", "Variant", "Quantity", "Condition", "Language", "Price EUR",
-        "TCGdex ID", "Data language", "Variant ID", "Binder Name",
+        "TCGdex ID", "Data language", "Variant ID", "Binder Name", "Purchase price", "Notes",
     )
 
     /**
@@ -471,7 +538,7 @@ class Repository(
             sb.appendLine(
                 Csv.row(
                     c.name, c.setName, c.numberLabel, c.variantLabel, i.quantity, i.condition, i.language, price,
-                    c.cardId, c.dataLang, c.variantId, binderNames[i.binderId] ?: "",
+                    c.cardId, c.dataLang, c.variantId, binderNames[i.binderId] ?: "", i.purchasePrice, i.notes ?: "",
                 )
             )
         }
@@ -499,12 +566,20 @@ class Repository(
         val iCond = col("Condition")
         val iLanguage = col("Language")
         val iBinder = col("Binder Name")
+        val iPaid = col("Purchase price")
+        val iNotes = col("Notes")
 
-        data class Line(val id: String, val dataLang: String, val qty: Int, val variant: String?, val cond: String?, val language: String?, val binder: String?)
+        data class Line(
+            val id: String, val dataLang: String, val qty: Int, val variant: String?, val cond: String?, val language: String?, val binder: String?,
+            val paid: Double? = null, val notes: String? = null,
+        )
         val lines = rows.drop(1).mapNotNull { r ->
             fun v(i: Int?) = i?.let { r.getOrNull(it)?.trim() }?.takeIf { it.isNotEmpty() }
             val id = v(iId) ?: return@mapNotNull null
-            Line(id, v(iLang) ?: "en", v(iQty)?.toIntOrNull() ?: 1, v(iVariant), v(iCond), v(iLanguage), v(iBinder))
+            Line(
+                id, v(iLang) ?: "en", v(iQty)?.toIntOrNull() ?: 1, v(iVariant), v(iCond), v(iLanguage), v(iBinder),
+                v(iPaid)?.replace(',', '.')?.toDoubleOrNull(), v(iNotes),
+            )
         }
         val keys = lines.map { it.dataLang to it.id }.distinct()
         val cards = HashMap<Pair<String, String>, TcgCard?>()
@@ -528,7 +603,11 @@ class Repository(
                 val binder = l.binder?.takeUnless { it.equals(Binder.UNSORTED_NAME, ignoreCase = true) }
                     ?.let { name -> binderIds.getOrPut(name.lowercase()) { createBinder(name) } }
                     ?: if (l.binder != null) Binder.UNSORTED else defaultBinder
-                addToCollection(ref, cond, l.language?.uppercase() ?: if (l.dataLang == "ja") "JA" else "EN", l.qty, binder)
+                val added = addToCollection(ref, cond, l.language?.uppercase() ?: if (l.dataLang == "ja") "JA" else "EN", l.qty, binder)
+                // Notes and purchase price fill in what the stack doesn't have yet.
+                if (l.paid != null || l.notes != null) coll.byId(added.itemId)?.let { s ->
+                    coll.update(s.copy(purchasePrice = s.purchasePrice ?: l.paid, notes = s.notes ?: l.notes))
+                }
                 imported += l.qty
             }
         }

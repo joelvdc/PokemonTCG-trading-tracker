@@ -157,6 +157,10 @@ data class CollectionItem(
     val addedAt: Long = System.currentTimeMillis(),
     /** The [Binder] this stack is in, or [Binder.UNSORTED]. Since version 1.5. */
     @ColumnInfo(defaultValue = "0") val binderId: Long = Binder.UNSORTED,
+    /** Free text about the copies, e.g. "slightly bent corner". Since 1.9. */
+    val notes: String? = null,
+    /** What one copy cost, in EUR, when known. Since 1.9. */
+    val purchasePrice: Double? = null,
 )
 
 /** A named group of cards in "My cards", like a real binder. Since version 1.5. */

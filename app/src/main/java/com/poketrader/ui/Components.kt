@@ -506,6 +506,9 @@ data class EditValues(
     /** "My cards" only: the binder, and how many copies move there when it's changed. */
     val binderId: Long = Binder.UNSORTED,
     val move: Int = 0,
+    /** "My cards" only: your notes on the stack and what you paid per card. Since 1.9. */
+    val notes: String? = null,
+    val purchasePrice: Double? = null,
 )
 
 private data class VariantData(val printings: List<CardRef>, val prices: Map<Int, PriceEntity>)
@@ -533,10 +536,13 @@ fun CardDialog(
     onChangeCard: (() -> Unit)? = null,
     /** With binders, the card (or some of its copies) can be moved to another binder. */
     binders: List<Binder>? = null,
+    /** "My cards": notes and purchase price fields. */
+    showNotes: Boolean = false,
 ) {
     val c = LocalContext.current.container
     var selected by remember { mutableStateOf(card) }
     var v by remember { mutableStateOf(initial) }
+    var paidText by remember { mutableStateOf(initial.purchasePrice?.let { "%.2f".format(it) } ?: "") }
     var customText by remember { mutableStateOf(initial.customPrice?.let { "%.2f".format(it) } ?: "") }
     var pickingPrinting by remember { mutableStateOf(false) }
     // The versions of the card shown: reloaded when another printing (set/number) is picked.
@@ -647,6 +653,40 @@ fun CardDialog(
                         singleLine = true,
                         enabled = enabled,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (showNotes) {
+                    OutlinedTextField(
+                        value = paidText,
+                        onValueChange = {
+                            paidText = it
+                            v = v.copy(purchasePrice = Fmt.parseMoney(it))
+                        },
+                        label = { Text("What you paid per card (optional)") },
+                        singleLine = true,
+                        enabled = enabled,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    val paid = v.purchasePrice
+                    val now = pricesOf(selected, data?.prices?.get(selected.cardmarketId))?.best(priceType)
+                    if (paid != null && paid > 0 && now != null) {
+                        val diff = (now - paid) * v.quantity
+                        Text(
+                            "Paid ${Fmt.money(paid * v.quantity)} · now ${Fmt.money(now * v.quantity)} · " +
+                                (if (diff >= 0) "+" else "−") + Fmt.money(kotlin.math.abs(diff)) + " (%+.0f%%)".format((now - paid) / paid * 100),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (diff >= 0) TrendColors.up else TrendColors.down,
+                        )
+                    }
+                    OutlinedTextField(
+                        value = v.notes ?: "",
+                        onValueChange = { v = v.copy(notes = it.ifBlank { null }) },
+                        label = { Text("Notes (where it came from, condition…)") },
+                        enabled = enabled,
+                        minLines = 2,
+                        maxLines = 5,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

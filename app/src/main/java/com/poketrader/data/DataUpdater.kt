@@ -26,6 +26,7 @@ class DataUpdater(
     private val catalog: CardmarketCatalog,
     private val repo: Repository,
     private val network: NetworkMonitor,
+    private val history: ValueHistory,
 ) {
     private val lock = Mutex()
 
@@ -34,17 +35,25 @@ class DataUpdater(
 
     /** Updates whatever is out of date, if automatic updates are allowed right now. */
     suspend fun autoUpdate() {
-        if (!allowedNow()) return
-        lock.withLock {
+        if (allowedNow()) lock.withLock {
             if (prices.isStale) prices.refresh()
             if (catalog.isStale && catalog.refresh()) recheckAll()
         }
+        recordValue()
     }
 
     /** Updates prices and the card list now, whatever the settings say. */
-    suspend fun updateNow() = lock.withLock {
-        prices.refresh()
-        if (catalog.refresh()) recheckAll()
+    suspend fun updateNow() {
+        lock.withLock {
+            prices.refresh()
+            if (catalog.refresh()) recheckAll()
+        }
+        recordValue()
+    }
+
+    /** Saves today's collection value for the value chart. */
+    private suspend fun recordValue() {
+        runCatching { history.record() }
     }
 
     /** Looks up every saved card's Cardmarket link again against a fresh card list. */

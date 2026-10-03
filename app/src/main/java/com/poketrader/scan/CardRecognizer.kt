@@ -142,6 +142,21 @@ class CardTextAnalyzer(private val onClues: (ScanClues) -> Unit) : ImageAnalysis
     private val recognizer = TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
     val paused = AtomicBoolean(false)
 
+    /** The last few frames' foil readings (see [FoilMeter]), for the card in front of the camera. */
+    private val shine = ArrayDeque<ShineSample>()
+
+    @Synchronized
+    fun shineSamples(): List<ShineSample> = shine.toList()
+
+    @Synchronized
+    fun resetShine() = shine.clear()
+
+    @Synchronized
+    private fun addShine(s: ShineSample) {
+        shine.addLast(s)
+        while (shine.size > 10) shine.removeFirst()
+    }
+
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(proxy: ImageProxy) {
         val media = proxy.image
@@ -152,6 +167,7 @@ class CardTextAnalyzer(private val onClues: (ScanClues) -> Unit) : ImageAnalysis
         val rotation = proxy.imageInfo.rotationDegrees
         val w = if (rotation % 180 == 0) proxy.width else proxy.height
         val h = if (rotation % 180 == 0) proxy.height else proxy.width
+        FoilMeter.sample(media, rotation, ScanGuide.boxFor(w.toFloat(), h.toFloat()), w, h)?.let(::addShine)
         recognizer.process(InputImage.fromMediaImage(media, rotation))
             .addOnSuccessListener { text ->
                 val lines = text.textBlocks.flatMap { b ->

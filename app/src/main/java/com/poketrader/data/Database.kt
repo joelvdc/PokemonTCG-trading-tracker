@@ -30,6 +30,9 @@ interface PriceDao {
 
     @Query("SELECT COUNT(*) FROM prices")
     fun count(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM prices")
+    suspend fun countNow(): Int
 }
 
 @Dao
@@ -43,6 +46,15 @@ interface CollectionDao {
            ORDER BY c.name COLLATE NOCASE"""
     )
     fun observeAll(): Flow<List<CollectionRow>>
+
+    @Query(
+        """SELECT c.*, p.idProduct AS pr_idProduct, p.avg AS pr_avg, p.low AS pr_low, p.trend AS pr_trend,
+           p.avg1 AS pr_avg1, p.avg7 AS pr_avg7, p.avg30 AS pr_avg30, p.avgHolo AS pr_avgHolo,
+           p.lowHolo AS pr_lowHolo, p.trendHolo AS pr_trendHolo, p.avg1Holo AS pr_avg1Holo,
+           p.avg7Holo AS pr_avg7Holo, p.avg30Holo AS pr_avg30Holo
+           FROM collection c LEFT JOIN prices p ON p.idProduct = c.cardmarketId"""
+    )
+    suspend fun allWithPrices(): List<CollectionRow>
 
     @Query("SELECT cardId, SUM(quantity) AS qty FROM collection GROUP BY cardId")
     fun observeOwned(): Flow<List<OwnedCount>>
@@ -214,10 +226,10 @@ interface ScanDao {
 @Database(
     entities = [
         PriceEntity::class, CollectionItem::class, Trade::class, TradeItem::class, Binder::class, ScannedCard::class,
-        CmProduct::class, CmSetExpansion::class,
+        CmProduct::class, CmSetExpansion::class, WishlistItem::class, ValueSnapshot::class,
     ],
-    version = 3,
-    exportSchema = false,
+    version = 4,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun priceDao(): PriceDao
@@ -226,22 +238,33 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun binderDao(): BinderDao
     abstract fun scanDao(): ScanDao
     abstract fun catalogDao(): CatalogDao
+    abstract fun wishlistDao(): WishlistDao
+    abstract fun valueHistoryDao(): ValueHistoryDao
 
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "poketrader.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
 
+        /** Version 4 (app 1.9): wishlist, value history, notes and purchase price. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `collection` ADD COLUMN `notes` TEXT")
+                db.execSQL("ALTER TABLE `collection` ADD COLUMN `purchasePrice` REAL")
+                V4_TABLES_SQL.forEach(db::execSQL)
+            }
+        }
+
         /** Version 3 (app 1.6): Cardmarket's product list, to check and fill in TCGdex's Cardmarket links. */
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 V3_TABLES_SQL.forEach(db::execSQL)
             }
         }
 
         /** Version 2 (app 1.5): binders and the Scan tab's waiting list. */
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `collection` ADD COLUMN `binderId` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("DROP INDEX IF EXISTS `index_collection_cardId_dataLang_variantId_condition_language`")
@@ -252,6 +275,20 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+
+/** New tables of version 4, exactly as Room creates them (from the exported schema, schemas/…/4.json). */
+private val V4_TABLES_SQL = listOf(
+    "CREATE TABLE IF NOT EXISTS `wishlist` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+        "`quantity` INTEGER NOT NULL, `anyVariant` INTEGER NOT NULL, `notes` TEXT, `addedAt` INTEGER NOT NULL, " +
+        "`ownedAtAdd` INTEGER NOT NULL DEFAULT 0, `cardId` TEXT NOT NULL, `dataLang` TEXT NOT NULL, " +
+        "`name` TEXT NOT NULL, `setId` TEXT NOT NULL, `setName` TEXT NOT NULL, `localId` TEXT NOT NULL, " +
+        "`setOfficial` INTEGER, `rarity` TEXT NOT NULL, `imageBase` TEXT, `variantId` TEXT NOT NULL, " +
+        "`variantLabel` TEXT NOT NULL, `cardmarketId` INTEGER, `holoPrice` INTEGER NOT NULL, `fallbackPrice` REAL, " +
+        "`firstEdition` INTEGER NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS `index_wishlist_cardId` ON `wishlist` (`cardId`)",
+    "CREATE TABLE IF NOT EXISTS `value_history` (`day` TEXT NOT NULL, `cards` INTEGER NOT NULL, " +
+        "`values` TEXT NOT NULL, PRIMARY KEY(`day`))",
+)
 
 /** New tables of version 3, exactly as Room creates them (copied from the generated AppDatabase_Impl). */
 private val V3_TABLES_SQL = listOf(

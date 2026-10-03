@@ -59,6 +59,7 @@ fun SettingsScreen() {
     val catalogFetched by c.settings.catalogFetchedAt.collectAsStateWithLifecycle()
     val autoUpdate by c.settings.autoUpdate.collectAsStateWithLifecycle()
     val wifiOnly by c.settings.wifiOnly.collectAsStateWithLifecycle()
+    val themeMode by c.settings.themeMode.collectAsStateWithLifecycle()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -76,6 +77,18 @@ fun SettingsScreen() {
                         Text(t.label)
                         Text(typeHelp[t] ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            Text("Appearance", style = MaterialTheme.typography.titleMedium)
+            com.poketrader.data.ThemeMode.entries.forEach { m ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { c.settings.setThemeMode(m) }.padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = m == themeMode, onClick = { c.settings.setThemeMode(m) })
+                    Text(m.label)
                 }
             }
 

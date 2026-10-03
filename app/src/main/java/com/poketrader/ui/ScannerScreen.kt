@@ -100,6 +100,11 @@ import com.poketrader.scan.CardTextAnalyzer
 import com.poketrader.scan.ScanClues
 import com.poketrader.scan.ScanGuide
 import com.poketrader.scan.ScanResult
+import com.poketrader.scan.FoilMeter
+import com.poketrader.scan.Shine
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
@@ -114,11 +119,20 @@ data class ScannedEntry(
     /** The card also exists as a jumbo print — the camera can't tell the size, so offer the switch. */
     val hasJumbo: Boolean = false,
     val condition: String = "NM",
+    /** The camera picked holo or reverse holo by itself (see [FoilMeter]); null when it didn't decide. Since 1.9. */
+    val autoShine: Shine? = null,
 ) {
     /** How many copies this line added. */
     val quantity get() = result.copies
 
     fun unitPrice(type: PriceType): Double? = prices.best(type) ?: card.fallbackPrice
+}
+
+/** Which version the scanner adds: the camera decides, or always normal, or always holo / reverse holo. Since 1.9. */
+enum class HoloMode(val label: String, val chip: String) {
+    AUTO("Let the camera tell", "✨ Holo: auto"),
+    NORMAL("Not holo", "✨ Not holo"),
+    HOLO("Holo or reverse holo", "✨ Holo"),
 }
 
 /** A recognised card waiting for "Add" (when auto-add is off). */
@@ -136,7 +150,7 @@ class ScanController(
 ) {
     private val recognizer = CardRecognizer(c.tcgdex, c.sets)
     var status by mutableStateOf("Hold a card inside the frame")
-    var holo by mutableStateOf(false)
+    var holoMode by mutableStateOf(HoloMode.AUTO)
     var autoAdd by mutableStateOf(true)
     var pending by mutableStateOf<PendingScan?>(null)
     var choose by mutableStateOf<ScanResult.Choose?>(null)
@@ -182,6 +196,8 @@ class ScanController(
                 if (key == candidateKey) hits++ else {
                     candidateKey = key
                     hits = 1
+                    // A different card: earlier foil readings belonged to the last one.
+                    analyzer.resetShine()
                 }
                 if (hits < 2 || key == lastAddedKey) {
                     if (key == lastAddedKey && autoAdd) status = "Added! Show the next card 👍"
@@ -207,11 +223,20 @@ class ScanController(
 
     suspend fun add(card: TcgCard, dataLang: String, language: String?) {
         val printings = card.printings(dataLang)
-        val ref = card.defaultPrinting(dataLang, holo)
+        // Only worth guessing when the card comes both with and without foil.
+        val plain = printings.filter { !it.firstEdition && !it.oversized }
+        val choice = plain.any { it.holoPrice || it.variantLabel.startsWith("Holo") } && plain.any { !it.holoPrice && !it.variantLabel.startsWith("Holo") }
+        val shine = if (holoMode == HoloMode.AUTO && choice) FoilMeter.judge(analyzer.shineSamples()) else null
+        val ref = when {
+            holoMode == HoloMode.HOLO -> card.defaultPrinting(dataLang, true)
+            shine == Shine.REVERSE -> plain.firstOrNull { it.holoPrice } ?: card.defaultPrinting(dataLang, true)
+            shine == Shine.HOLO -> plain.firstOrNull { it.variantLabel.startsWith("Holo") } ?: card.defaultPrinting(dataLang, true)
+            else -> card.defaultPrinting(dataLang, false)
+        }
         val lang = language ?: if (dataLang == "ja") "JA" else "EN"
         val hasJumbo = printings.any { it.oversized }
         val result = c.repo.add(target, ref, lang, hasJumbo = hasJumbo) ?: return
-        added.add(0, ScannedEntry(ref, lang, result, c.repo.snapshot(ref), hasJumbo = hasJumbo))
+        added.add(0, ScannedEntry(ref, lang, result, c.repo.snapshot(ref), hasJumbo = hasJumbo, autoShine = shine?.takeIf { it != Shine.NORMAL }))
         pending = null
         status = "Added ${card.name}!"
         onAdded()
@@ -228,7 +253,7 @@ class ScanController(
     fun change(e: ScannedEntry, card: CardRef, condition: String, language: String, quantity: Int) = scope.launch {
         val result = c.repo.changeAdded(e.result, target, card, condition, language, quantity, e.hasJumbo) ?: return@launch
         val i = added.indexOf(e)
-        val updated = e.copy(card = card, language = language, condition = condition, result = result, prices = c.repo.snapshot(card))
+        val updated = e.copy(card = card, language = language, condition = condition, result = result, prices = c.repo.snapshot(card), autoShine = null)
         if (i >= 0) added[i] = updated else added.add(0, updated)
     }
 
@@ -324,7 +349,18 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FilterChip(selected = controller.holo, onClick = { controller.holo = !controller.holo }, label = { Text("✨ Holo") })
+                Box {
+                    var holoMenu by remember { mutableStateOf(false) }
+                    FilterChip(selected = controller.holoMode != HoloMode.NORMAL, onClick = { holoMenu = true }, label = { Text(controller.holoMode.chip) })
+                    DropdownMenu(expanded = holoMenu, onDismissRequest = { holoMenu = false }) {
+                        HoloMode.entries.forEach { m ->
+                            DropdownMenuItem(
+                                text = { Text(m.label, fontWeight = if (m == controller.holoMode) FontWeight.Bold else null) },
+                                onClick = { holoMenu = false; controller.holoMode = m },
+                            )
+                        }
+                    }
+                }
                 FilterChip(selected = controller.autoAdd, onClick = { controller.autoAdd = !controller.autoAdd }, label = { Text("Auto-add") })
                 Text(
                     controller.status,
@@ -339,7 +375,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
             controller.pending?.let { p ->
                 Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CardImage(p.card.defaultPrinting(p.dataLang, controller.holo).thumbUrl, Modifier.width(44.dp), fallbackKey = ImageKey(p.card.id, p.dataLang))
+                        CardImage(p.card.defaultPrinting(p.dataLang, controller.holoMode == HoloMode.HOLO).thumbUrl, Modifier.width(44.dp), fallbackKey = ImageKey(p.card.id, p.dataLang))
                         Spacer(Modifier.width(8.dp))
                         Column(Modifier.weight(1f)) {
                             Text(p.card.name, style = MaterialTheme.typography.titleSmall)
@@ -425,6 +461,13 @@ private fun ScannedRow(e: ScannedEntry, price: Double?, onClick: () -> Unit, onA
                     if (e.hasJumbo && !e.card.oversized) {
                         Text("Big card? Tap it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
+                }
+                e.autoShine?.let { s ->
+                    Text(
+                        (if (s == Shine.REVERSE) "Looks like a reverse holo" else "Looks like a holo") + " · tap if not",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
             Column(horizontalAlignment = Alignment.End) {

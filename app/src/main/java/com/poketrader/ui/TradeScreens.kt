@@ -215,6 +215,8 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
     val data by remember(tradeId) { c.db.tradeDao().observe(tradeId) }.collectAsStateWithLifecycle(null)
     val owned by remember { c.db.collectionDao().observeOwned() }.collectAsStateWithLifecycle(emptyList())
     val ownedMap = remember(owned) { owned.associate { it.cardId to it.qty } }
+    val wishRows by remember { c.db.wishlistDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
+    val wanted = remember(wishRows) { wishRows.map { it.item.card.cardId }.toSet() }
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
     val tolerance by c.settings.tolerancePct.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -333,7 +335,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                 )
             }
             tradeSide(
-                title = "I get", side = Side.GET, items = t.get, priceType = priceType, ownedMap = null, locked = applied,
+                title = "I get", side = Side.GET, items = t.get, priceType = priceType, ownedMap = null, locked = applied, wanted = wanted,
                 onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GET)) },
                 onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GET)) },
                 onEdit = { editing = it },
@@ -462,6 +464,7 @@ private fun LazyGridScope.tradeSide(
     onScan: () -> Unit,
     onSearch: () -> Unit,
     onEdit: (TradeItem) -> Unit,
+    wanted: Set<String> = emptySet(),
 ) {
     item(key = "header-$side", span = { GridItemSpan(maxLineSpan) }) {
         Column(Modifier.padding(top = 16.dp, bottom = 4.dp)) {
@@ -507,6 +510,7 @@ private fun LazyGridScope.tradeSide(
             quantity = item.quantity,
             language = item.language,
             footnote = when {
+                item.card.cardId in wanted -> "★ on your wishlist"
                 owned == null -> null
                 owned >= item.quantity -> "✓ in My cards"
                 else -> "✗ not in My cards"

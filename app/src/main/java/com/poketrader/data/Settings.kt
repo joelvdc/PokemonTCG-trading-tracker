@@ -15,8 +15,27 @@ enum class CollectionView(val label: String) {
     }
 }
 
+/** Light or dark colours. Since 1.9. */
+enum class ThemeMode(val label: String) {
+    SYSTEM("Same as the phone"),
+    LIGHT("Light"),
+    DARK("Dark");
+
+    companion object {
+        fun fromKey(key: String?) = entries.firstOrNull { it.name == key } ?: SYSTEM
+    }
+}
+
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    private val _themeMode = MutableStateFlow(ThemeMode.fromKey(prefs.getString("themeMode", null)))
+    val themeMode: StateFlow<ThemeMode> = _themeMode
+
+    fun setThemeMode(v: ThemeMode) {
+        _themeMode.value = v
+        prefs.edit().putString("themeMode", v.name).apply()
+    }
 
     private val _priceType = MutableStateFlow(PriceType.fromKey(prefs.getString("priceType", null)))
     val priceType: StateFlow<PriceType> = _priceType

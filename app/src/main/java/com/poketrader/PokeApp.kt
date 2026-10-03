@@ -17,6 +17,7 @@ import com.poketrader.data.Settings
 import com.poketrader.data.TcgdexApi
 import com.poketrader.data.TradeWithItems
 import com.poketrader.data.TcgplayerImages
+import com.poketrader.data.ValueHistory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -61,7 +62,8 @@ class AppContainer(context: Context) {
     val catalog = CardmarketCatalog(context, http, db, settings, tcgdex).also { cat ->
         tcgdex.repair = { card, lang -> cat.repair(card, lang) }
     }
-    val updater = DataUpdater(context, settings, prices, catalog, repo, network)
+    val history = ValueHistory(db)
+    val updater = DataUpdater(context, settings, prices, catalog, repo, network, history)
 
     /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
     @Volatile

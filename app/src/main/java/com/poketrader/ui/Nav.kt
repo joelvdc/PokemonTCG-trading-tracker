@@ -120,6 +120,7 @@ fun AppNav() {
             composable("collection") { CollectionScreen(nav) }
             composable("scans") { ScansScreen(nav) }
             composable("settings") { SettingsScreen() }
+            composable("value") { ValueScreen(nav) }
             composable("trade/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                 TradeEditorScreen(nav, it.arguments?.getLong("id") ?: 0L)
             }
