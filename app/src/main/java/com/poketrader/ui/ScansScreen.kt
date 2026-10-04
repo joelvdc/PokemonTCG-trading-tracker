@@ -246,7 +246,7 @@ private fun ToBinderDialog(count: Int, onDismiss: () -> Unit, onConfirm: (Binder
     var keep by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Put $count card(s) in “My cards”") },
+        title = { Text("Put $count card(s) in the collection") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BinderPicker("Binder", choice, { choice = it }, suggestedName = "New cards ${Fmt.date(System.currentTimeMillis())}")

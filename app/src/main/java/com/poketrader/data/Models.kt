@@ -163,7 +163,7 @@ data class CollectionItem(
     val purchasePrice: Double? = null,
 )
 
-/** A named group of cards in "My cards", like a real binder. Since version 1.5. */
+/** A named group of cards in the collection, like a real binder. Since version 1.5. */
 @Entity(tableName = "binders")
 data class Binder(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

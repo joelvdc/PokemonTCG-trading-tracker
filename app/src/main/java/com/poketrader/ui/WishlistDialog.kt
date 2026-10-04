@@ -58,7 +58,7 @@ fun WishlistDialog(
                         Text("#${card.numberLabel} · ${card.variantLabel}", style = MaterialTheme.typography.bodySmall)
                         owned?.let {
                             Text(
-                                if (it.owned > 0) "You have ${it.owned}" + (if (it.gotSince > 0) " (${it.gotSince} got since adding it)" else "") else "Not in My cards yet",
+                                if (it.owned > 0) "You have ${it.owned}" + (if (it.gotSince > 0) " (${it.gotSince} got since adding it)" else "") else "Not in your collection yet",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

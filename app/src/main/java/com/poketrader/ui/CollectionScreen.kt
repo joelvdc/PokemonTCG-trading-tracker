@@ -93,6 +93,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TaskAlt
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -108,7 +109,7 @@ private enum class SortBy(val label: String, val forward: String, val backward: 
 /** The wishlist's place in the binder bar (binder ids are positive). */
 private const val WISHLIST = -2L
 
-/** The wishlist shows with the same card views as "My cards". */
+/** The wishlist shows with the same card views as the collection. */
 private fun WishlistRow.asCollectionRow() =
     CollectionRow(CollectionItem(id = item.id, card = item.card, quantity = item.quantity, addedAt = item.addedAt), price)
 
@@ -181,7 +182,7 @@ fun CollectionScreen(nav: NavController) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("My cards") },
+                title = { Text("Collection") },
                 actions = {
                     IconButton(onClick = { viewMenu = true }) {
                         Icon(
@@ -305,11 +306,11 @@ fun CollectionScreen(nav: NavController) {
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallFloatingActionButton(onClick = { nav.openSearch(addTarget) }) { Icon(Icons.Default.Search, "Search") }
+                SmallFloatingActionButton(onClick = { nav.openScanner(addTarget) }) { Icon(Icons.Default.CameraAlt, "Scan cards") }
                 ExtendedFloatingActionButton(
-                    onClick = { nav.openScanner(addTarget) },
-                    icon = { Icon(Icons.Default.CameraAlt, null) },
-                    text = { Text("Scan cards", fontSize = 18.sp) },
+                    onClick = { nav.openSearch(addTarget) },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("Add card", fontSize = 18.sp) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 )
@@ -427,7 +428,7 @@ fun CollectionScreen(nav: NavController) {
                 all.isEmpty() && !wish -> EmptyState(
                     "📦",
                     "No cards yet",
-                    "Tap “Scan cards” and hold your cards in front of the camera. Cards from finished trades show up here too.",
+                    "Tap the camera button and hold your cards in front of it, or “Add card” to find them by name. Cards from finished trades show up here too.",
                 )
                 shown.isEmpty() && filter.isBlank() -> EmptyState(
                     "📒",
@@ -463,42 +464,7 @@ fun CollectionScreen(nav: NavController) {
         }
     }
 
-    editing?.let { row ->
-        val item = row.item
-        CardDialog(
-            card = item.card,
-            initial = EditValues(item.quantity, item.condition, item.language, null, item.binderId, item.quantity, item.notes, item.purchasePrice),
-            priceType = priceType,
-            confirmLabel = "Save",
-            allowCustomPrice = false,
-            binders = binders,
-            showNotes = true,
-            onDismiss = { editing = null },
-            onConfirm = { card, v ->
-                editing = null
-                scope.launch {
-                    c.repo.saveCollectionEdit(
-                        item.copy(
-                            card = card, quantity = v.quantity, condition = v.condition, language = v.language,
-                            notes = v.notes?.trim()?.ifEmpty { null }, purchasePrice = v.purchasePrice,
-                        ),
-                        v.binderId, v.move,
-                    )
-                }
-            },
-            onDelete = {
-                editing = null
-                scope.launch {
-                    c.repo.deleteCollectionItem(item.id)
-                    if (snackbar.showUndo("${item.card.name} removed")) c.repo.restoreCollectionItem(item)
-                }
-            },
-            onChangeCard = {
-                editing = null
-                nav.openSearch(CardTarget.ReplaceCollectionItem(item.id), item.card.name)
-            },
-        )
-    }
+    editing?.let { row -> CollectionCardDialog(row, nav, snackbar, scope) { editing = null } }
 
     editingWish?.let { row ->
         WishlistDialog(
@@ -655,4 +621,50 @@ private fun CsvImportCard(p: CsvImportProgress) {
             )
         }
     }
+}
+
+/**
+ * A collection card's window: version, quantity, condition, language, binder, notes and what you
+ * paid, prices. Also opened from the value screen. [scope] must outlive the dialog (the screen's),
+ * so saving isn't cancelled when it closes.
+ */
+@Composable
+fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: SnackbarHostState, scope: CoroutineScope, onDismiss: () -> Unit) {
+    val c = LocalContext.current.container
+    val priceType by c.settings.priceType.collectAsStateWithLifecycle()
+    val binders = rememberBinders()
+    val item = row.item
+    CardDialog(
+        card = item.card,
+        initial = EditValues(item.quantity, item.condition, item.language, null, item.binderId, item.quantity, item.notes, item.purchasePrice),
+        priceType = priceType,
+        confirmLabel = "Save",
+        allowCustomPrice = false,
+        binders = binders,
+        showNotes = true,
+        onDismiss = onDismiss,
+        onConfirm = { card, v ->
+            onDismiss()
+            scope.launch {
+                c.repo.saveCollectionEdit(
+                    item.copy(
+                        card = card, quantity = v.quantity, condition = v.condition, language = v.language,
+                        notes = v.notes?.trim()?.ifEmpty { null }, purchasePrice = v.purchasePrice,
+                    ),
+                    v.binderId, v.move,
+                )
+            }
+        },
+        onDelete = {
+            onDismiss()
+            scope.launch {
+                c.repo.deleteCollectionItem(item.id)
+                if (snackbar.showUndo("${item.card.name} removed")) c.repo.restoreCollectionItem(item)
+            }
+        },
+        onChangeCard = {
+            onDismiss()
+            nav.openSearch(CardTarget.ReplaceCollectionItem(item.id), item.card.name)
+        },
+    )
 }

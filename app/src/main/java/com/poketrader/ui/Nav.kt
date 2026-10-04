@@ -46,7 +46,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val tabs = listOf(
     Tab("trades", "Trades", Icons.Default.SwapHoriz),
-    Tab("collection", "My cards", Icons.Default.CollectionsBookmark),
+    Tab("collection", "Collection", Icons.Default.CollectionsBookmark),
     Tab("scans", "Scan", Icons.Default.CameraAlt),
     Tab("settings", "Settings", Icons.Default.Settings),
 )
@@ -57,6 +57,14 @@ fun NavController.openSearch(target: CardTarget, query: String? = null) {
 }
 
 fun NavController.openScanner(target: CardTarget) = navigate("scan?target=${Uri.encode(target.encode())}")
+
+/**
+ * Leaves the screen for a Back or Done button, once: a second quick tap while the screen is already
+ * closing would otherwise also close the one underneath (and could leave the tabs in a muddle).
+ * Returns whether it left.
+ */
+fun NavController.safePopBackStack(): Boolean =
+    currentBackStackEntry?.lifecycle?.currentState == androidx.lifecycle.Lifecycle.State.RESUMED && popBackStack()
 
 @Composable
 fun AppNav() {
@@ -115,6 +123,10 @@ fun AppNav() {
             }
         },
     ) { pad ->
+        // Reopened after Android closed the app in the background: don't come back straight into the camera.
+        LaunchedEffect(Unit) {
+            if (nav.currentDestination?.route?.startsWith("scan?") == true) nav.popBackStack()
+        }
         NavHost(nav, startDestination = "trades", modifier = Modifier.padding(pad)) {
             composable("trades") { TradesListScreen(nav) }
             composable("collection") { CollectionScreen(nav) }

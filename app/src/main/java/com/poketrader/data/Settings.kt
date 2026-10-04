@@ -4,7 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Ways to show "My cards": big card pictures (as before 1.7), a list with small pictures, or one text line per card. */
+/** Ways to show the collection: big card pictures (as before 1.7), a list with small pictures, or one text line per card. */
 enum class CollectionView(val label: String) {
     CARDS("Cards (big pictures)"),
     LIST("List"),
@@ -63,7 +63,7 @@ class Settings(context: Context) {
     private val _wifiOnly = MutableStateFlow(prefs.getBoolean("wifiOnly", false))
     val wifiOnly: StateFlow<Boolean> = _wifiOnly
 
-    /** How "My cards" shows the cards. Since 1.7. */
+    /** How the collection shows the cards. Since 1.7. */
     private val _collectionView = MutableStateFlow(CollectionView.fromKey(prefs.getString("collectionView", null)))
     val collectionView: StateFlow<CollectionView> = _collectionView
 

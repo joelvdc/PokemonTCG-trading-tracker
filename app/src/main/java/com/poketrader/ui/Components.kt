@@ -503,10 +503,10 @@ data class EditValues(
     val condition: String,
     val language: String,
     val customPrice: Double?,
-    /** "My cards" only: the binder, and how many copies move there when it's changed. */
+    /** Collection only: the binder, and how many copies move there when it's changed. */
     val binderId: Long = Binder.UNSORTED,
     val move: Int = 0,
-    /** "My cards" only: your notes on the stack and what you paid per card. Since 1.9. */
+    /** Collection only: your notes on the stack and what you paid per card. Since 1.9. */
     val notes: String? = null,
     val purchasePrice: Double? = null,
 )
@@ -536,7 +536,7 @@ fun CardDialog(
     onChangeCard: (() -> Unit)? = null,
     /** With binders, the card (or some of its copies) can be moved to another binder. */
     binders: List<Binder>? = null,
-    /** "My cards": notes and purchase price fields. */
+    /** Collection: notes and purchase price fields. */
     showNotes: Boolean = false,
 ) {
     val c = LocalContext.current.container

@@ -164,7 +164,7 @@ class Repository(
         all.filter { it.card.cardId == w.card.cardId && it.card.dataLang == w.card.dataLang && (w.anyVariant || it.card.variantId == w.card.variantId) }
             .sumOf { it.quantity }
 
-    /** Each wishlist entry against "My cards". */
+    /** Each wishlist entry against the collection. */
     fun wishlistOwned(items: List<WishlistItem>, collection: List<CollectionItem>): Map<Long, WishlistOwned> =
         items.associate { w ->
             val owned = ownedFor(w, collection)
@@ -254,7 +254,7 @@ class Repository(
     }
 
     /**
-     * Adds the cards you got to "My cards" (in [binderId]) and takes the cards you gave out of it,
+     * Adds the cards you got to the collection (in [binderId]) and takes the cards you gave out of it,
      * from Unsorted before other binders. Returns how many given copies weren't found.
      */
     suspend fun applyTrade(tradeId: Long, binderId: Long = Binder.UNSORTED): Int = db.withTransaction {
@@ -446,7 +446,7 @@ class Repository(
         return { scans.restore(items) }
     }
 
-    /** Adds the scans to "My cards" in [binderId]; unless [keep], they leave the scan list. */
+    /** Adds the scans to the collection in [binderId]; unless [keep], they leave the scan list. */
     suspend fun scansToCollection(ids: List<Long>, binderId: Long, keep: Boolean): UndoAction {
         val items = scans.byIds(ids)
         db.withTransaction {

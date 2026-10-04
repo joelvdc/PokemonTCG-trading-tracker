@@ -315,9 +315,9 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                         Text(rememberTargetLabel(target), style = MaterialTheme.typography.bodySmall)
                     }
                 },
-                navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { nav.safePopBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = { nav.popBackStack(); nav.openSearch(target) }) { Icon(Icons.Default.Search, "Search instead") }
+                    IconButton(onClick = { if (nav.safePopBackStack()) nav.openSearch(target) }) { Icon(Icons.Default.Search, "Search instead") }
                     IconButton(onClick = { torch = !torch }) {
                         Icon(if (torch) Icons.Default.FlashOn else Icons.Default.FlashOff, "Light")
                     }
@@ -327,7 +327,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
         bottomBar = {
             Surface(tonalElevation = 3.dp) {
                 Button(
-                    onClick = { nav.popBackStack() },
+                    onClick = { nav.safePopBackStack() },
                     modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
                 ) { Text(if (controller.added.isEmpty()) "Done" else "Done · ${controller.added.size} card(s)") }
             }

@@ -46,6 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.poketrader.container
+import com.poketrader.data.CollectionRow
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.rememberCoroutineScope
 import com.poketrader.data.PriceMove
 import com.poketrader.data.ValueHistory
 import com.poketrader.data.ValuePoint
@@ -71,15 +76,19 @@ fun ValueScreen(nav: NavController) {
     }
     val risers = remember(rows) { ValueHistory.biggestMoves(rows, up = true) }
     val fallers = remember(rows) { ValueHistory.biggestMoves(rows, up = false) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var opened by remember { mutableStateOf<CollectionRow?>(null) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("Collection value") },
-                navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { nav.safePopBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
         LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item(key = "now") {
@@ -120,11 +129,11 @@ fun ValueScreen(nav: NavController) {
             }
             if (risers.isNotEmpty()) {
                 item(key = "up") { MovesHeader("Rising lately") }
-                items(risers, key = { "u${it.row.item.id}" }) { MoveRow(it) }
+                items(risers, key = { "u${it.row.item.id}" }) { MoveRow(it) { opened = it.row } }
             }
             if (fallers.isNotEmpty()) {
                 item(key = "down") { MovesHeader("Falling lately") }
-                items(fallers, key = { "d${it.row.item.id}" }) { MoveRow(it) }
+                items(fallers, key = { "d${it.row.item.id}" }) { MoveRow(it) { opened = it.row } }
             }
             if (risers.isNotEmpty() || fallers.isNotEmpty()) {
                 item(key = "note") {
@@ -137,6 +146,8 @@ fun ValueScreen(nav: NavController) {
             }
         }
     }
+
+    opened?.let { row -> CollectionCardDialog(row, nav, snackbar, scope) { opened = null } }
 }
 
 private fun shortDate(d: LocalDate): String = d.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
@@ -147,9 +158,9 @@ private fun MovesHeader(text: String) {
 }
 
 @Composable
-private fun MoveRow(m: PriceMove) {
+private fun MoveRow(m: PriceMove, onClick: () -> Unit) {
     val item = m.row.item
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         CardImage(
             item.card.thumbUrl, Modifier.width(40.dp), placeholder = item.card.name,
             fallbackKey = com.poketrader.data.ImageKey(item.card.cardId, item.card.dataLang, item.card.variantId),

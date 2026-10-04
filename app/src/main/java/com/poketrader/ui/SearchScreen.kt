@@ -69,14 +69,14 @@ import com.poketrader.scan.CardTextParser
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** "Adding to: …" for the search and scanner screens, naming the binder for "My cards" targets. */
+/** "Adding to: …" for the search and scanner screens, naming the binder for the collection targets. */
 @Composable
 fun rememberTargetLabel(t: CardTarget): String {
     val binders = rememberBinders()
     return when (t) {
         is CardTarget.TradeSide -> if (t.side == Side.GET) "Adding to: I get" else "Adding to: I give"
         is CardTarget.Collection ->
-            if (t.binderId == Binder.UNSORTED) "Adding to: My cards" else "Adding to: ${binderName(t.binderId, binders)}"
+            if (t.binderId == Binder.UNSORTED) "Adding to: Collection" else "Adding to: ${binderName(t.binderId, binders)}"
         CardTarget.Scans -> "Adding to: Scanned cards"
         CardTarget.Wishlist -> "Adding to: Wishlist"
         else -> "Choose the right card"
@@ -203,10 +203,10 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                         Text(rememberTargetLabel(target), style = MaterialTheme.typography.bodySmall)
                     }
                 },
-                navigationIcon = { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { nav.safePopBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     if (!target.isReplace) {
-                        IconButton(onClick = { nav.popBackStack(); nav.openScanner(target) }) { Icon(Icons.Default.CameraAlt, "Scan instead") }
+                        IconButton(onClick = { if (nav.safePopBackStack()) nav.openScanner(target) }) { Icon(Icons.Default.CameraAlt, "Scan instead") }
                     }
                 },
             )

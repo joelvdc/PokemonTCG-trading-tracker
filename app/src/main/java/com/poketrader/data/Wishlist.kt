@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * A card you want. By default any variant of the card will do (normal, reverse holo…); with
- * [anyVariant] off, only this exact variant. Shown as the Wishlist in "My cards", not counted in
+ * [anyVariant] off, only this exact variant. Shown as the Wishlist in the collection, not counted in
  * the collection's value. Since 1.9.
  */
 @Entity(tableName = "wishlist", indices = [Index("cardId")])
@@ -37,7 +37,7 @@ data class WishlistRow(
     fun unitPrice(type: PriceType): Double? = price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice
 }
 
-/** A wishlist entry against "My cards": copies owned now, and copies got since it was added. */
+/** A wishlist entry against the collection: copies owned now, and copies got since it was added. */
 data class WishlistOwned(val owned: Int, val gotSince: Int)
 
 @Dao

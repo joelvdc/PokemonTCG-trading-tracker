@@ -1,30 +1,30 @@
 # Poké Trader (Android)
 
 A kid-friendly app for trading Pokémon cards: scan or search the cards on each side, see at a glance whether the
-trade is fair (Cardmarket prices, €), and keep "My cards" (the collection) up to date when the trade is done.
+trade is fair (Cardmarket prices, €), and keep the collection up to date when the trade is done.
 
-| Trade | Search | Card | My cards |
+| Trade | Search | Card | Collection |
 |:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="My cards as big card pictures"> |
+| <img src="docs/screenshots/trade.png" width="200" alt="A trade with the value of both sides compared"> | <img src="docs/screenshots/search.png" width="200" alt="Search results as a grid of card pictures"> | <img src="docs/screenshots/card.png" width="200" alt="A card with its Cardmarket prices"> | <img src="docs/screenshots/collection.png" width="200" alt="The collection as big card pictures"> |
 
-| My cards: list | My cards: compact |
+| Collection: list | Collection: compact |
 |:---:|:---:|
-| <img src="docs/screenshots/collection-list.png" width="200" alt="My cards as a list with small pictures, set, number and price"> | <img src="docs/screenshots/collection-compact.png" width="200" alt="My cards as one text line per card"> |
+| <img src="docs/screenshots/collection-list.png" width="200" alt="The collection as a list with small pictures, set, number and price"> | <img src="docs/screenshots/collection-compact.png" width="200" alt="The collection as one text line per card"> |
 
 ## Install
-Copy `PokeTrader-1.9.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
+Copy `PokeTrader-1.10.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
 asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.9-universal.apk` instead (bigger, runs on any device).
+`PokeTrader-1.10-universal.apk` instead (bigger, runs on any device).
 
 ## Binders
-"My cards" can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
+The collection can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
 binder with its card count. From the ⋮ menu you can create, rename, delete and **merge** binders (e.g. a "new cards"
 binder into your main one; identical cards are combined). Tap a card to move it, or some of its copies, to another
 binder. "We traded!" asks which binder the new cards go into (or makes a new one); cards you give are taken from
 Unsorted first. The CSV backup keeps each card's binder. Card tiles show the price of one card, with the total for a
 stack underneath ("×4 · €80.00"), and "Most valuable" sorts by that single-card price.
 
-"My cards" can be shown as **cards** (big pictures, the default), a **list** (small picture, set and number, tags and
+The collection can be shown as **cards** (big pictures, the default), a **list** (small picture, set and number, tags and
 price) or **compact** (one text line per card); pick it with the view button next to Sort. Every sort can be
 reversed (A to Z / Z to A, most valuable / cheapest first, newest / oldest first).
 
@@ -32,7 +32,9 @@ Tap a card to add **notes** and **what you paid** per card; the card then shows 
 now. Both are kept in the CSV backup.
 
 **Value over time:** tap the total above the cards (or ⋮ → Value over time). The app saves the collection's value once
-a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately.
+a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately (tap one to open it).
+
+Add cards with the big **+ Add card** button (search by name) or the camera button above it (scanner).
 
 ## Wishlist
 The **★ Wishlist** in the binder bar holds the cards you want: pick it, then scan or search them. Any version of the card

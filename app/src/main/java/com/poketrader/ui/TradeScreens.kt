@@ -101,6 +101,7 @@ fun TradesListScreen(nav: NavController) {
     val trades by remember { c.db.tradeDao().observeAll() }.collectAsStateWithLifecycle(null)
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
     val tolerance by c.settings.tolerancePct.collectAsStateWithLifecycle()
+    var creatingTrade by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
 
@@ -139,7 +140,19 @@ fun TradesListScreen(nav: NavController) {
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { scope.launch { nav.navigate("trade/${c.repo.newTrade()}") } },
+                onClick = {
+                    // One trade per tap, even when the phone is slow to react right after starting.
+                    if (!creatingTrade) {
+                        creatingTrade = true
+                        scope.launch {
+                            try {
+                                nav.navigate("trade/${c.repo.newTrade()}") { launchSingleTop = true }
+                            } finally {
+                                creatingTrade = false
+                            }
+                        }
+                    }
+                },
                 icon = { Icon(Icons.Default.Add, null) },
                 text = { Text("New trade", fontSize = 18.sp) },
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -247,7 +260,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    IconButton(onClick = { nav.safePopBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 },
                 actions = {
                     IconButton(onClick = {
@@ -289,7 +302,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                         if (applied) {
                             Icon(Icons.Default.CheckCircle, null, tint = VerdictColors.fair)
                             Spacer(Modifier.width(8.dp))
-                            Text("Trade done — cards moved in “My cards”", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                            Text("Trade done — your collection is updated", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                             OutlinedButton(onClick = {
                                 scope.launch {
                                     c.repo.revertTrade(tradeId)
@@ -399,7 +412,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "The $getN card(s) you got go into “My cards”, and the $giveN card(s) you gave are taken out " +
+                        "The $getN card(s) you got go into your collection, and the $giveN card(s) you gave are taken out " +
                             "(from ${Binder.UNSORTED_NAME} first).\n\nYou can undo this later."
                     )
                     if (getN > 0) {
@@ -418,8 +431,8 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                     scope.launch {
                         val missing = c.repo.applyTrade(tradeId, c.repo.resolve(binder))
                         snackbar.showSnackbar(
-                            if (missing == 0) "Done! “My cards” is updated"
-                            else "Done! ($missing given card(s) weren't in “My cards”)"
+                            if (missing == 0) "Done! Your collection is updated"
+                            else "Done! ($missing given card(s) weren't in your collection)"
                         )
                     }
                 }) { Text("Yes, we traded") }
@@ -434,7 +447,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
             title = { Text("Delete this trade?") },
             text = {
                 Text(
-                    if (applied) "The trade is removed from the list. “My cards” stays as it is now (use Undo first to reverse the card changes)."
+                    if (applied) "The trade is removed from the list. Your collection stays as it is now (use Undo first to reverse the card changes)."
                     else "The trade and its cards will be removed."
                 )
             },
@@ -512,8 +525,8 @@ private fun LazyGridScope.tradeSide(
             footnote = when {
                 item.card.cardId in wanted -> "★ on your wishlist"
                 owned == null -> null
-                owned >= item.quantity -> "✓ in My cards"
-                else -> "✗ not in My cards"
+                owned >= item.quantity -> "✓ in your collection"
+                else -> "✗ not in your collection"
             },
             footnoteIsWarning = owned != null && owned < item.quantity,
             trend = item.prices.trendChange,

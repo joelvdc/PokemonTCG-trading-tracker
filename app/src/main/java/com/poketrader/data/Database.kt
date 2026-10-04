@@ -148,7 +148,7 @@ interface TradeDao {
     )
     suspend fun findSame(tradeId: Long, side: String, cardId: String, dataLang: String, variantId: String, lang: String): TradeItem?
 
-    /** Trades not yet applied to "My cards", newest first. */
+    /** Trades not yet applied to the collection, newest first. */
     @Query("SELECT * FROM trades WHERE applied = 0 ORDER BY createdAt DESC")
     fun observeOpen(): Flow<List<Trade>>
 }
