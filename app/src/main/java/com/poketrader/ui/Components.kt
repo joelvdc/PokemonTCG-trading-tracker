@@ -108,6 +108,9 @@ import java.util.Currency
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.Surface
 
 object Fmt {
     private val eur = NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
@@ -123,6 +126,101 @@ object Fmt {
 
     /** Parses "3,50" or "3.50"; null for blank/invalid. */
     fun parseMoney(s: String): Double? = s.trim().replace(',', '.').toDoubleOrNull()
+
+    private val eurWhole = NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
+        currency = Currency.getInstance("EUR")
+        maximumFractionDigits = 0
+    }
+
+    /** "€1,005": no cents. Since 1.11. */
+    fun wholeMoney(v: Double): String = eurWhole.format(v)
+
+    /** "€10k", "€1.2M": for tight spaces; small amounts keep their cents. Since 1.11. */
+    fun shortMoney(v: Double): String {
+        if (abs(v) < 1000) return eur.format(v)
+        val (n, unit) = if (abs(v) >= 1_000_000) v / 1_000_000 to "M" else v / 1000 to "k"
+        val number = java.text.DecimalFormat("0.#", java.text.DecimalFormatSymbols.getInstance(Locale.getDefault())).format(n) + unit
+        val symbolFirst = !eur.format(1.0).first().isDigit()
+        return if (symbolFirst) "€$number" else "$number €"
+    }
+}
+
+/**
+ * Shows the first of [variants] (longest to shortest) that fits on one line; the last one is cut
+ * with "…" if even that doesn't fit. Since 1.11.
+ */
+@Composable
+fun FittingText(variants: List<String>, style: TextStyle, modifier: Modifier = Modifier, fontWeight: FontWeight? = null) {
+    var index by remember(variants) { androidx.compose.runtime.mutableIntStateOf(0) }
+    Text(
+        variants[index],
+        style = style,
+        fontWeight = fontWeight,
+        maxLines = 1,
+        softWrap = false,
+        overflow = if (index == variants.lastIndex) TextOverflow.Ellipsis else TextOverflow.Clip,
+        onTextLayout = { r -> if (r.hasVisualOverflow && index < variants.lastIndex) index++ },
+        modifier = modifier,
+    )
+}
+
+/**
+ * A slim, rounded search field, used for every search and filter box. [onSearch] runs on the
+ * keyboard's search key; [fieldModifier] goes on the text itself (e.g. a focus requester). Since 1.11.
+ */
+@Composable
+fun SearchField(
+    value: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    onSearch: (() -> Unit)? = null,
+    fieldModifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .height(44.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(start = 14.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Search, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f)) {
+            if (value.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(imeAction = if (onSearch != null) androidx.compose.ui.text.input.ImeAction.Search else androidx.compose.ui.text.input.ImeAction.Default),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { onSearch?.invoke() }),
+                modifier = fieldModifier.fillMaxWidth(),
+            )
+        }
+        if (value.isNotEmpty()) {
+            IconButton(onClick = { onChange("") }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Clear, "Clear", Modifier.size(20.dp)) }
+        }
+    }
+}
+
+/** A small outlined button with an icon, for tight rows. Since 1.11. */
+@Composable
+fun SmallAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+        }
+    }
 }
 
 /** A card picture at card proportions. With [enlargeUrl], tapping opens it full-screen. */
@@ -475,9 +573,9 @@ fun TrendBadge(trend: PriceTrend?, modifier: Modifier = Modifier, style: TextSty
 }
 
 @Composable
-fun PriceTable(prices: PriceSet?, highlight: PriceType) {
+fun PriceTable(prices: PriceSet?, highlight: PriceType, title: Boolean = true) {
     Column {
-        Text("Cardmarket prices", style = MaterialTheme.typography.labelLarge)
+        if (title) Text("Cardmarket prices", style = MaterialTheme.typography.labelLarge)
         if (prices == null || prices.isEmpty) {
             Text("No Cardmarket price for this card yet.", style = MaterialTheme.typography.bodySmall)
             return

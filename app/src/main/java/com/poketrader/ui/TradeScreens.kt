@@ -26,6 +26,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ViewColumn
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
@@ -232,6 +234,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
     val wanted = remember(wishRows) { wishRows.map { it.item.card.cardId }.toSet() }
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
     val tolerance by c.settings.tolerancePct.collectAsStateWithLifecycle()
+    val columns by c.settings.tradeColumns.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
 
     var partner by remember { mutableStateOf<String?>(null) }
@@ -263,6 +266,12 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                     IconButton(onClick = { nav.safePopBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 },
                 actions = {
+                    IconButton(onClick = { c.settings.setTradeColumns(!columns) }) {
+                        Icon(
+                            if (columns) Icons.Default.ViewAgenda else Icons.Default.ViewColumn,
+                            if (columns) "Show the sides one above the other" else "Show the sides next to each other",
+                        )
+                    }
                     IconButton(onClick = {
                         t?.let {
                             val send = Intent(Intent.ACTION_SEND).apply {
@@ -347,18 +356,40 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
             }
-            tradeSide(
-                title = "I get", side = Side.GET, items = t.get, priceType = priceType, ownedMap = null, locked = applied, wanted = wanted,
-                onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GET)) },
-                onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GET)) },
-                onEdit = { editing = it },
-            )
-            tradeSide(
-                title = "I give", side = Side.GIVE, items = t.give, priceType = priceType, ownedMap = ownedMap, locked = applied,
-                onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GIVE)) },
-                onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GIVE)) },
-                onEdit = { editing = it },
-            )
+            if (columns) {
+                // Give on the left, get on the right, like the cards on the table.
+                item(key = "columns", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TradeColumn(
+                            "I give", t.give, priceType, ownedMap, emptySet(), applied,
+                            onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GIVE)) },
+                            onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GIVE)) },
+                            onEdit = { editing = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                        TradeColumn(
+                            "I get", t.get, priceType, null, wanted, applied,
+                            onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GET)) },
+                            onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GET)) },
+                            onEdit = { editing = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            } else {
+                tradeSide(
+                    title = "I get", side = Side.GET, items = t.get, priceType = priceType, ownedMap = null, locked = applied, wanted = wanted,
+                    onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GET)) },
+                    onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GET)) },
+                    onEdit = { editing = it },
+                )
+                tradeSide(
+                    title = "I give", side = Side.GIVE, items = t.give, priceType = priceType, ownedMap = ownedMap, locked = applied,
+                    onScan = { nav.openScanner(CardTarget.TradeSide(tradeId, Side.GIVE)) },
+                    onSearch = { nav.openSearch(CardTarget.TradeSide(tradeId, Side.GIVE)) },
+                    onEdit = { editing = it },
+                )
+            }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 OutlinedTextField(
                     value = notes ?: "",
@@ -531,6 +562,77 @@ private fun LazyGridScope.tradeSide(
             footnoteIsWarning = owned != null && owned < item.quantity,
             trend = item.prices.trendChange,
         ) { onEdit(item) }
+    }
+}
+
+/** One side of a trade as a narrow column, for the side-by-side layout. Since 1.11. */
+@Composable
+private fun TradeColumn(
+    title: String,
+    items: List<TradeItem>,
+    priceType: PriceType,
+    ownedMap: Map<String, Int>?,
+    wanted: Set<String>,
+    locked: Boolean,
+    onScan: () -> Unit,
+    onSearch: () -> Unit,
+    onEdit: (TradeItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            "${items.sumOf { it.quantity }} card(s) · " + Fmt.money(items.sumOf { it.lineTotal(priceType) }),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!locked) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(onClick = onScan, contentPadding = PaddingValues(horizontal = 8.dp), modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.CameraAlt, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Scan", maxLines = 1)
+                }
+                FilledTonalButton(onClick = onSearch, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Icon(Icons.Default.Search, "Search", Modifier.size(16.dp))
+                }
+            }
+        }
+        if (items.isEmpty()) {
+            Text("No cards yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+        }
+        items.forEach { item -> CompactTradeItem(item, priceType, ownedMap?.let { it[item.card.cardId] ?: 0 }, item.card.cardId in wanted) { onEdit(item) } }
+    }
+}
+
+@Composable
+private fun CompactTradeItem(item: TradeItem, priceType: PriceType, owned: Int?, wanted: Boolean, onClick: () -> Unit) {
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().padding(6.dp)) {
+            CardImage(item.card.thumbUrl, Modifier.width(34.dp), placeholder = "#" + item.card.numberLabel, fallbackKey = ImageKey(item.card.cardId, item.card.dataLang, item.card.variantId))
+            Spacer(Modifier.width(6.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    (if (item.quantity > 1) "${item.quantity}× " else "") + item.card.name,
+                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    listOfNotNull("#" + item.card.numberLabel, variantBadge(item.card), item.condition, item.language.takeIf { it != "EN" }).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(Fmt.money(item.lineTotal(priceType)), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    if (item.customPrice != null) Text(" agreed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                if (wanted) Text("★ wishlist", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                if (owned != null && owned < item.quantity) {
+                    Text(if (owned > 0) "You own $owned" else "Not owned", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
     }
 }
 

@@ -72,6 +72,33 @@ class Settings(context: Context) {
         prefs.edit().putString("collectionView", v.name).apply()
     }
 
+    /** The collection's sort levels. Since 1.11. */
+    private val _collectionSort = MutableStateFlow(SortSpec.decode(prefs.getString("collectionSort", null)))
+    val collectionSort: StateFlow<SortSpec> = _collectionSort
+
+    fun setCollectionSort(v: SortSpec) {
+        _collectionSort.value = v
+        prefs.edit().putString("collectionSort", v.encode()).apply()
+    }
+
+    /** The card page lists all your other copies of the card, not just the first few. Since 1.11. */
+    private val _cardOthersOpen = MutableStateFlow(prefs.getBoolean("cardOthersOpen", false))
+    val cardOthersOpen: StateFlow<Boolean> = _cardOthersOpen
+
+    fun setCardOthersOpen(v: Boolean) {
+        _cardOthersOpen.value = v
+        prefs.edit().putBoolean("cardOthersOpen", v).apply()
+    }
+
+    /** Show a trade's two sides next to each other (give left, get right). Since 1.11. */
+    private val _tradeColumns = MutableStateFlow(prefs.getBoolean("tradeColumns", false))
+    val tradeColumns: StateFlow<Boolean> = _tradeColumns
+
+    fun setTradeColumns(v: Boolean) {
+        _tradeColumns.value = v
+        prefs.edit().putBoolean("tradeColumns", v).apply()
+    }
+
     /** How far saved cards' Cardmarket links have been checked; see [Repository.repairSavedCards]. */
     var cardLinksVersion: Int
         get() = prefs.getInt("cardLinksVersion", 0)

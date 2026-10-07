@@ -12,9 +12,18 @@ trade is fair (Cardmarket prices, €), and keep the collection up to date when 
 | <img src="docs/screenshots/collection-list.png" width="200" alt="The collection as a list with small pictures, set, number and price"> | <img src="docs/screenshots/collection-compact.png" width="200" alt="The collection as one text line per card"> |
 
 ## Install
-Copy `PokeTrader-1.10.apk` to the phone and open it (allow "install unknown apps" for your file manager/browser when
-asked). It's built for 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.10-universal.apk` instead (bigger, runs on any device).
+[<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/joelvdc/PokemonTCG-trading-tracker)
+
+**With Obtainium (recommended):** [Obtainium](https://github.com/ImranR98/Obtainium) installs the app straight from
+this page's releases and tells you when there's a new version. Tap the badge above on the phone (or add
+`https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
+pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
+
+**By hand:** download `PokeTrader-1.11.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
+64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
+`PokeTrader-1.11-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+your cards.
 
 ## Binders
 The collection can be split into binders: the bar above the cards shows **All**, **Unsorted** (cards in no binder) and each
@@ -25,16 +34,28 @@ Unsorted first. The CSV backup keeps each card's binder. Card tiles show the pri
 stack underneath ("×4 · €80.00"), and "Most valuable" sorts by that single-card price.
 
 The collection can be shown as **cards** (big pictures, the default), a **list** (small picture, set and number, tags and
-price) or **compact** (one text line per card); pick it with the view button next to Sort. Every sort can be
-reversed (A to Z / Z to A, most valuable / cheapest first, newest / oldest first).
+price) or **compact** (one text line per card); pick it with the view button next to Sort.
 
-Tap a card to add **notes** and **what you paid** per card; the card then shows what you paid against what it's worth
-now. Both are kept in the CSV backup.
+**Sort** works in layers: e.g. rarest first, then by name, then by set. Each layer can be reversed, there are ready-made
+choices (name, set and number, rarest, most valuable, newest), and the app remembers your sort. **Filter** narrows the
+cards by set, rarity, version (holo, reverse holo…), international or Japanese print, condition, language and price;
+active filters show as chips under the search field, tap one's ✕ to drop it.
+
+**The card page** (tap a card) is compact: picture, price and trend on top; **Printing** (another set or number),
+**Other card** (if the scanner picked the wrong one) and **Cardmarket** buttons; then quantity, version, binder,
+condition, language, **what you paid** and **notes**, two to a row. Underneath, **"You also own…"** lists every other
+copy of the card with the same name (same card first, then by value; tap one to open it), and Cardmarket's prices fold
+into one line (tap for all). Save only lights up once something has changed. Notes and purchase price are kept in the
+CSV backup.
 
 **Value over time:** tap the total above the cards (or ⋮ → Value over time). The app saves the collection's value once
 a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately (tap one to open it).
 
 Add cards with the big **+ Add card** button (search by name) or the camera button above it (scanner).
+
+## Trades side by side
+The button at the top of a trade switches between the two sides one above the other and **side by side** (give on the
+left, get on the right, like the cards on the table). The app remembers your choice.
 
 ## Wishlist
 The **★ Wishlist** in the binder bar holds the cards you want: pick it, then scan or search them. Any version of the card

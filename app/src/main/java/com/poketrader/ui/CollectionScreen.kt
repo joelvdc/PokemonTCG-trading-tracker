@@ -38,9 +38,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -82,7 +85,9 @@ import androidx.navigation.NavController
 import com.poketrader.container
 import com.poketrader.data.Binder
 import com.poketrader.data.CardTarget
+import com.poketrader.data.CollectionFilter
 import com.poketrader.data.CollectionRow
+import com.poketrader.data.Rarities
 import com.poketrader.data.CollectionView
 import com.poketrader.data.ImageKey
 import com.poketrader.data.CsvImportProgress
@@ -97,14 +102,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/** Each order with its natural direction first ([forward]) and the reverse ([backward]). */
-private enum class SortBy(val label: String, val forward: String, val backward: String) {
-    NAME("Name", "A to Z", "Z to A"),
-    VALUE("Value (per card)", "Most valuable first", "Cheapest first"),
-    RECENT("When added", "Newest first", "Oldest first"),
-    SET("Set", "A to Z", "Z to A"),
-}
 
 /** The wishlist's place in the binder bar (binder ids are positive). */
 private const val WISHLIST = -2L
@@ -125,13 +122,15 @@ fun CollectionScreen(nav: NavController) {
     val view by c.settings.collectionView.collectAsStateWithLifecycle()
     var viewMenu by remember { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf("") }
-    var sort by rememberSaveable { mutableStateOf(SortBy.NAME) }
-    var reversed by rememberSaveable { mutableStateOf(false) }
+    val sort by c.settings.collectionSort.collectAsStateWithLifecycle()
+    var filterText by rememberSaveable { mutableStateOf("") }
+    val cardFilter = remember(filterText) { CollectionFilter.decode(filterText) }
+    var sorting by remember { mutableStateOf(false) }
+    var filtering by remember { mutableStateOf(false) }
     val wishRows by remember { c.db.wishlistDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
     var editingWish by remember { mutableStateOf<WishlistRow?>(null) }
     // null is "All", Binder.UNSORTED is cards outside binders.
     var selected by rememberSaveable { mutableStateOf<Long?>(null) }
-    var sortMenu by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<CollectionRow?>(null) }
     var naming by remember { mutableStateOf<Binder?>(null) }
@@ -203,23 +202,9 @@ fun CollectionScreen(nav: NavController) {
                             )
                         }
                     }
-                    IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "Sort") }
-                    DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                        SortBy.entries.forEach { s ->
-                            DropdownMenuItem(
-                                text = { Text(s.label, fontWeight = if (s == sort) FontWeight.Bold else null) },
-                                leadingIcon = { if (s == sort) Icon(Icons.Default.Check, null) },
-                                onClick = { if (s != sort) reversed = false; sort = s; sortMenu = false },
-                            )
-                        }
-                        HorizontalDivider()
-                        listOf(false to sort.forward, true to sort.backward).forEach { (r, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label, fontWeight = if (r == reversed) FontWeight.Bold else null) },
-                                leadingIcon = { if (r == reversed) Icon(Icons.Default.Check, null) },
-                                onClick = { reversed = r; sortMenu = false },
-                            )
-                        }
+                    IconButton(onClick = { sorting = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "Sort") }
+                    IconButton(onClick = { filtering = true }) {
+                        BadgedBox(badge = { if (cardFilter.count > 0) Badge { Text("${cardFilter.count}") } }) { Icon(Icons.Default.FilterList, "Filter") }
                     }
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -324,22 +309,17 @@ fun CollectionScreen(nav: NavController) {
         }
         val counts = remember(all) { all.groupBy { it.item.binderId }.mapValues { (_, r) -> r.sumOf { it.item.quantity } } }
         val wishById = remember(wishRows) { wishRows.associateBy { it.item.id } }
-        val shown = remember(all, wishRows, filter, sort, reversed, priceType, selected) {
-            val f = filter.trim()
+        val inView = remember(all, wishRows, selected) {
             val source = if (wish) wishRows.map { it.asCollectionRow() } else all
-            source.filter { r ->
-                (wish || selected == null || r.item.binderId == selected) &&
-                    (f.isEmpty() || r.item.card.name.contains(f, true) || r.item.card.setName.contains(f, true))
-            }.let { list ->
-                when (sort) {
-                    SortBy.NAME -> list
-                    // By the price of one card, so a stack of cheap cards doesn't outrank a single valuable one.
-                    SortBy.VALUE -> list.sortedByDescending { it.unitPrice(priceType) ?: 0.0 }
-                    SortBy.RECENT -> list.sortedByDescending { it.item.addedAt }
-                    SortBy.SET -> list.sortedWith(compareBy({ it.item.card.setName }, { it.item.card.localId.filter(Char::isDigit).toIntOrNull() ?: 0 }))
-                }.let { if (reversed) it.asReversed() else it }
-            }
+            source.filter { r -> wish || selected == null || r.item.binderId == selected }
         }
+        val shown = remember(inView, filter, cardFilter, sort, priceType) {
+            val f = filter.trim()
+            inView.filter { r ->
+                (f.isEmpty() || r.item.card.name.contains(f, true) || r.item.card.setName.contains(f, true)) && cardFilter.matches(r, priceType)
+            }.sortedWith(sort.comparator(priceType))
+        }
+        val ownedSets = remember(inView) { ownedSets(inView) }
         fun footnote(row: CollectionRow): String? = when {
             wish -> wishById[row.item.id]?.let { w ->
                 val o = wishOwned[w.item.id]
@@ -401,24 +381,29 @@ fun CollectionScreen(nav: NavController) {
                 Modifier.fillMaxWidth().clickable(enabled = !wish) { nav.navigate("value") }.padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    if (wish) "$totalCards card${if (totalCards == 1) "" else "s"} wanted · ${Fmt.money(totalValue)} to buy them"
-                    else "$totalCards card${if (totalCards == 1) "" else "s"} · worth ${Fmt.money(totalValue)}",
+                val n = "%,d".format(totalCards)
+                val cards = "$n card${if (totalCards == 1) "" else "s"}"
+                FittingText(
+                    if (wish) listOf(
+                        "$cards wanted · ${Fmt.money(totalValue)} to buy them",
+                        "$cards wanted · ${Fmt.money(totalValue)}",
+                        "$cards · ${Fmt.shortMoney(totalValue)}",
+                    ) else listOf(
+                        "$cards · worth ${Fmt.money(totalValue)}",
+                        "$cards · ${Fmt.money(totalValue)}",
+                        "$cards · ${Fmt.wholeMoney(totalValue)}",
+                        "$n · ${Fmt.shortMoney(totalValue)}",
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 if (!wish) Icon(Icons.AutoMirrored.Filled.ShowChart, "Value over time", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
             }
-            OutlinedTextField(
-                value = filter,
-                onValueChange = { filter = it },
-                placeholder = { Text("Find a card") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = { if (filter.isNotEmpty()) IconButton(onClick = { filter = "" }) { Icon(Icons.Default.Clear, "Clear") } },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            )
+            SearchField(filter, { filter = it }, "Find a card", Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
+            if (!cardFilter.isEmpty) {
+                ActiveFilterChips(cardFilter, ownedSets, onChange = { filterText = it.encode() }, onEdit = { filtering = true })
+            }
             when {
                 wish && wishRows.isEmpty() -> EmptyState(
                     "⭐",
@@ -430,7 +415,12 @@ fun CollectionScreen(nav: NavController) {
                     "No cards yet",
                     "Tap the camera button and hold your cards in front of it, or “Add card” to find them by name. Cards from finished trades show up here too.",
                 )
-                shown.isEmpty() && filter.isBlank() -> EmptyState(
+                shown.isEmpty() && (filter.isNotBlank() || !cardFilter.isEmpty) -> EmptyState(
+                    "🔍",
+                    "No cards match",
+                    "Try another search, or clear the filter.",
+                )
+                shown.isEmpty() -> EmptyState(
                     "📒",
                     if (selected == Binder.UNSORTED) "No unsorted cards" else "This binder is empty",
                     "Scan or search cards while this binder is open, send scanned cards here from the Scan tab, or move cards in from another binder.",
@@ -465,6 +455,23 @@ fun CollectionScreen(nav: NavController) {
     }
 
     editing?.let { row -> CollectionCardDialog(row, nav, snackbar, scope) { editing = null } }
+
+    if (sorting) {
+        SortDialog(sort, onDismiss = { sorting = false }) { c.settings.setCollectionSort(it); sorting = false }
+    }
+    if (filtering) {
+        val source = (if (wish) wishRows.map { it.asCollectionRow() } else rows.orEmpty())
+            .filter { r -> wish || selected == null || r.item.binderId == selected }
+        FilterDialog(
+            cardFilter, ownedSets(source),
+            rarities = source.map { it.item.card.rarity }.filter { it.isNotBlank() }.distinct().sortedByDescending { Rarities.rank(it) },
+            variants = source.map { it.item.card.variantLabel }.distinct().sorted(),
+            languages = source.map { it.item.language }.distinct().sorted(),
+            count = { f -> source.filter { f.matches(it, priceType) }.sumOf { it.item.quantity } },
+            onDismiss = { filtering = false },
+            onApply = { filterText = it.encode(); filtering = false },
+        )
+    }
 
     editingWish?.let { row ->
         WishlistDialog(
@@ -623,48 +630,6 @@ private fun CsvImportCard(p: CsvImportProgress) {
     }
 }
 
-/**
- * A collection card's window: version, quantity, condition, language, binder, notes and what you
- * paid, prices. Also opened from the value screen. [scope] must outlive the dialog (the screen's),
- * so saving isn't cancelled when it closes.
- */
-@Composable
-fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: SnackbarHostState, scope: CoroutineScope, onDismiss: () -> Unit) {
-    val c = LocalContext.current.container
-    val priceType by c.settings.priceType.collectAsStateWithLifecycle()
-    val binders = rememberBinders()
-    val item = row.item
-    CardDialog(
-        card = item.card,
-        initial = EditValues(item.quantity, item.condition, item.language, null, item.binderId, item.quantity, item.notes, item.purchasePrice),
-        priceType = priceType,
-        confirmLabel = "Save",
-        allowCustomPrice = false,
-        binders = binders,
-        showNotes = true,
-        onDismiss = onDismiss,
-        onConfirm = { card, v ->
-            onDismiss()
-            scope.launch {
-                c.repo.saveCollectionEdit(
-                    item.copy(
-                        card = card, quantity = v.quantity, condition = v.condition, language = v.language,
-                        notes = v.notes?.trim()?.ifEmpty { null }, purchasePrice = v.purchasePrice,
-                    ),
-                    v.binderId, v.move,
-                )
-            }
-        },
-        onDelete = {
-            onDismiss()
-            scope.launch {
-                c.repo.deleteCollectionItem(item.id)
-                if (snackbar.showUndo("${item.card.name} removed")) c.repo.restoreCollectionItem(item)
-            }
-        },
-        onChangeCard = {
-            onDismiss()
-            nav.openSearch(CardTarget.ReplaceCollectionItem(item.id), item.card.name)
-        },
-    )
-}
+/** The sets among [rows], for the filter, by name. */
+private fun ownedSets(rows: List<CollectionRow>): List<OwnedSet> =
+    rows.groupBy { it.item.card.setId }.map { (id, r) -> OwnedSet(id, r.first().item.card.setName, r.sumOf { it.item.quantity }) }.sortedBy { it.name.lowercase() }

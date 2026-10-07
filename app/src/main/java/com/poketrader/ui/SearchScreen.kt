@@ -214,24 +214,17 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
         Column(Modifier.padding(pad).imePadding()) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { text ->
+            SearchField(
+                query,
+                { text ->
                     query = text
                     // Typing a number after the chosen name only narrows the results; changing the name starts over.
-                    if (!SearchText.keepsName(text, selectedName)) selectedName = null
+                    if (text.isEmpty() || !SearchText.keepsName(text, selectedName)) selectedName = null
                 },
-                placeholder = { Text("Name, + number if you like (Pikachu 86)") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) IconButton(onClick = { query = ""; selectedName = null }) { Icon(Icons.Default.Clear, "Clear") }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    if (selectedName == null) suggestions.firstOrNull()?.let { pick(it) }
-                }),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).focusRequester(focus),
+                "Name, + number if you like (Pikachu 86)",
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                onSearch = { if (selectedName == null) suggestions.firstOrNull()?.let { pick(it) } },
+                fieldModifier = Modifier.focusRequester(focus),
             )
             if (selectedName != null && !CardTextParser.containsJapanese(selectedName ?: "")) {
                 Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

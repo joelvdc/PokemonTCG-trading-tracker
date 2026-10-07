@@ -56,6 +56,18 @@ interface CollectionDao {
     )
     suspend fun allWithPrices(): List<CollectionRow>
 
+    /** Every stack of cards with this name (all sets, versions and binders), for the card page. Since 1.11. */
+    @Query(
+        """SELECT c.*, p.idProduct AS pr_idProduct, p.avg AS pr_avg, p.low AS pr_low, p.trend AS pr_trend,
+           p.avg1 AS pr_avg1, p.avg7 AS pr_avg7, p.avg30 AS pr_avg30, p.avgHolo AS pr_avgHolo,
+           p.lowHolo AS pr_lowHolo, p.trendHolo AS pr_trendHolo, p.avg1Holo AS pr_avg1Holo,
+           p.avg7Holo AS pr_avg7Holo, p.avg30Holo AS pr_avg30Holo
+           FROM collection c LEFT JOIN prices p ON p.idProduct = c.cardmarketId
+           WHERE c.name = :name COLLATE NOCASE
+           ORDER BY c.setName, c.localId"""
+    )
+    fun observeByName(name: String): kotlinx.coroutines.flow.Flow<List<CollectionRow>>
+
     @Query("SELECT cardId, SUM(quantity) AS qty FROM collection GROUP BY cardId")
     fun observeOwned(): Flow<List<OwnedCount>>
 
