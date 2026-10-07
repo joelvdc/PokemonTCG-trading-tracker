@@ -32,8 +32,21 @@ object FallbackImages {
     fun base(tcgdexBase: String?, dataLang: String, setId: String, localId: String): String? =
         tcgdexBase ?: if (dataLang != "en") null else setIds[setId]?.let { "$CDN/$it/${ptcgNumber(localId)}" }
 
-    fun thumb(base: String?): String? = base?.let { if (it.startsWith(CDN)) "$it.png" else "$it/low.webp" }
-    fun large(base: String?): String? = base?.let { if (it.startsWith(CDN)) "${it}_hires.png" else "$it/high.webp" }
+    fun thumb(base: String?): String? = base?.let {
+        when {
+            it.startsWith(CDN) -> "$it.png"
+            it.startsWith(LimitlessCards.IMAGE_CDN) -> "${it}_SM.png"
+            else -> "$it/low.webp"
+        }
+    }
+
+    fun large(base: String?): String? = base?.let {
+        when {
+            it.startsWith(CDN) -> "${it}_hires.png"
+            it.startsWith(LimitlessCards.IMAGE_CDN) -> "${it}_LG.png"
+            else -> "$it/high.webp"
+        }
+    }
 
     /** pokemontcg.io writes plain numbers without leading zeros ("004" → "4"), and keeps "TG03", "SM226". */
     fun ptcgNumber(localId: String) = if (localId.all(Char::isDigit)) localId.trimStart('0').ifEmpty { "0" } else localId

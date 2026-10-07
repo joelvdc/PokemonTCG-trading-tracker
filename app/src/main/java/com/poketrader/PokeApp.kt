@@ -9,6 +9,7 @@ import com.poketrader.data.AppDatabase
 import com.poketrader.data.CardmarketCatalog
 import com.poketrader.data.DataUpdater
 import com.poketrader.data.FallbackImageSets
+import com.poketrader.data.LimitlessCards
 import com.poketrader.data.NetworkMonitor
 import com.poketrader.data.PriceGuideRepository
 import com.poketrader.data.Repository
@@ -61,6 +62,9 @@ class AppContainer(context: Context) {
     val repo = Repository(db, tcgdex, prices, appScope)
     val catalog = CardmarketCatalog(context, http, db, settings, tcgdex).also { cat ->
         tcgdex.repair = { card, lang -> cat.repair(card, lang) }
+    }
+    val limitless = LimitlessCards(context, http, tcgdex, sets).also { l ->
+        tcgdex.missingJapanese = { setId, number -> l.card(setId, number) }
     }
     val history = ValueHistory(db)
     val updater = DataUpdater(context, settings, prices, catalog, repo, network, history)

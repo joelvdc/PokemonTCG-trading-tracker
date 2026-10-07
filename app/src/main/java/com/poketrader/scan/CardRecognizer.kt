@@ -20,8 +20,17 @@ sealed interface ScanResult {
     /** [language] is the card's print language ("EN", "FR", "JA"…) when it could be told. */
     data class Found(val card: TcgCard, val dataLang: String, val language: String?, val exact: Boolean) : ScanResult
 
-    /** The name was read but several printings fit: let the user pick by picture. */
-    data class Choose(val name: String, val candidates: List<Candidate>, val dataLang: String, val language: String?) : ScanResult
+    /**
+     * The name was read but several printings fit: let the user pick by picture. [missing] is the
+     * printing that was read but isn't in the card database ("Pokémon GO (S10b) #043"). Since 1.12.
+     */
+    data class Choose(
+        val name: String,
+        val candidates: List<Candidate>,
+        val dataLang: String,
+        val language: String?,
+        val missing: String? = null,
+    ) : ScanResult
 }
 
 /** Turns OCR clues into a TCGdex card. Lookups (including misses) are cached per clue. */
@@ -43,10 +52,17 @@ class CardRecognizer(private val api: TcgdexApi, private val catalog: SetCatalog
         return v
     }
 
+    /** Set and number that were read but have no card in TCGdex (its Japanese data has gaps), for the user. */
+    var lastMissing: String? = null
+        private set
+
     suspend fun identify(c: ScanClues): ScanResult? {
-        val dataLang = if (c.japanese) "ja" else "en"
+        val dataLang = c.dataLang
+        lastMissing = null
         if (c.number != null) byNumber(c, dataLang)?.let { return it }
-        if (c.name != null) byName(c, dataLang)?.let { return it }
+        if (c.name != null) byName(c, dataLang)?.let { r ->
+            return if (r is ScanResult.Choose) r.copy(missing = lastMissing) else r
+        }
         return null
     }
 
@@ -54,13 +70,38 @@ class CardRecognizer(private val api: TcgdexApi, private val catalog: SetCatalog
         val number = c.number ?: return null
         var sets = c.total?.let { catalog.withCount(dataLang, it) }.orEmpty()
         val code = c.setCode
+        var codeMatched = false
         if (code != null) {
             if (dataLang == "ja") {
-                catalog.find("ja", code)?.let { direct -> sets = listOf(direct) + sets.filter { it.id != direct.id } }
+                val direct = catalog.find("ja", code)
+                    // A misread code: the set with this card count whose id is closest to what was read.
+                    ?: sets.map { it to CardTextParser.codeSimilarity(code, it.id) }.filter { it.second >= 0.5 }.maxByOrNull { it.second }?.first
+                if (direct != null) {
+                    sets = listOf(direct) + sets.filter { it.id != direct.id }
+                    codeMatched = true
+                }
             } else {
                 val matching = sets.take(8).filter { catalog.abbreviation("en", it.id).equals(code, ignoreCase = true) }
-                if (matching.isNotEmpty()) sets = matching
+                if (matching.isNotEmpty()) {
+                    sets = matching
+                    codeMatched = true
+                } else if (sets.size <= 8) {
+                    // A printed set code no set with this card count has (e.g. CLV, Trading Card Game Classic).
+                    lastMissing = "$code $number"
+                }
             }
+        }
+        if (codeMatched) {
+            val set = sets.first()
+            val card = cachedCard("$dataLang/${set.id}/$number") { api.cardInSet(set.id, number, dataLang) }
+            if (card == null) {
+                // The set is known but TCGdex has no such card in it (many Japanese sets are incomplete):
+                // don't guess from other sets, let the name search offer same-name cards instead.
+                lastMissing = "${set.id} #$number"
+                return null
+            }
+            // No name to check (a Korean card): the printed set code is what makes the number trustworthy.
+            if (c.name == null) return ScanResult.Found(card, dataLang, c.language ?: if (dataLang == "ja") "JA" else null, exact = true)
         }
         val found = mutableListOf<Triple<TcgCard, Double, String?>>()
         for (s in sets.take(6)) {
@@ -73,11 +114,12 @@ class CardRecognizer(private val api: TcgdexApi, private val catalog: SetCatalog
         val language = c.language ?: best.third
         return when {
             c.name != null && best.second >= 0.6 -> ScanResult.Found(best.first, dataLang, language, exact = true)
-            c.name == null && found.size == 1 -> ScanResult.Found(best.first, dataLang, language, exact = code != null)
+            // Without a name, only the printed set code makes the number trustworthy; otherwise show the picture first.
+            c.name == null && found.size == 1 && codeMatched -> ScanResult.Found(best.first, dataLang, language, exact = true)
             c.name == null -> ScanResult.Choose(
                 "#$number",
                 found.map { Candidate(TcgBrief(it.first.id, it.first.localId, it.first.name, it.first.image), it.first.set.name) },
-                dataLang, language,
+                dataLang, language, lastMissing,
             )
             else -> null // the name doesn't fit this number: the number was probably misread
         }
@@ -122,7 +164,7 @@ class CardRecognizer(private val api: TcgdexApi, private val catalog: SetCatalog
             val byNum = matches.filter { it.localId.trimStart('0').equals(stripped, ignoreCase = true) }
             if (byNum.isNotEmpty()) matches = byNum
         }
-        if (matches.size == 1) {
+        if (matches.size == 1 && lastMissing == null) {
             val b = matches.first()
             val card = cachedCard("$dataLang/${b.id}") { api.card(b.id, dataLang) } ?: return null
             return ScanResult.Found(card, dataLang, c.language ?: if (dataLang == "ja") "JA" else searchLang.uppercase(), exact = true)

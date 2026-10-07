@@ -287,10 +287,21 @@ class TcgdexApi(private val http: OkHttpClient) {
     @Volatile
     var repair: (suspend (TcgCard, String) -> TcgCard)? = null
 
+    /**
+     * Japanese cards TCGdex is missing, from another source ([LimitlessCards]); set once at start-up.
+     * Takes the set id and the printed number. Since 1.12.
+     */
+    @Volatile
+    var missingJapanese: (suspend (String, String) -> TcgCard?)? = null
+
+    private suspend fun missing(setId: String, number: String, lang: String): TcgCard? =
+        if (lang != "ja") null else missingJapanese?.let { f -> runCatching { f(setId, number) }.getOrNull() }
+
     private suspend fun repaired(card: TcgCard, lang: String): TcgCard =
         repair?.let { fix -> runCatching { fix(card, lang) }.getOrNull() } ?: card
 
-    suspend fun card(id: String, lang: String): TcgCard? = cardAsIs(id, lang)?.let { repaired(it, lang) }
+    suspend fun card(id: String, lang: String): TcgCard? =
+        cardAsIs(id, lang)?.let { repaired(it, lang) } ?: missing(id.substringBeforeLast('-'), id.substringAfterLast('-'), lang)
 
     /** A card exactly as TCGdex has it, without Cardmarket corrections. */
     suspend fun cardAsIs(id: String, lang: String): TcgCard? {
@@ -306,7 +317,7 @@ class TcgdexApi(private val http: OkHttpClient) {
             val body = call(url(lang, "sets/$setId/$n")) ?: continue
             return repaired(json.decodeFromString<TcgCard>(body), lang)
         }
-        return null
+        return missing(setId, number, lang)
     }
 
     /** The cards of one set (brief form). */

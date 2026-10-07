@@ -69,6 +69,7 @@ import com.poketrader.data.CardTarget
 import com.poketrader.data.ImageKey
 import com.poketrader.data.CollectionRow
 import com.poketrader.data.LANGUAGES
+import com.poketrader.data.LimitlessCards
 import com.poketrader.data.PriceEntity
 import com.poketrader.data.PriceType
 import kotlinx.coroutines.CoroutineScope
@@ -185,6 +186,13 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                             nav.openSearch(CardTarget.ReplaceCollectionItem(item.id), item.card.name)
                         }
                         SmallAction("Cardmarket", Icons.AutoMirrored.Filled.OpenInNew) { runCatching { uriHandler.openUri(CardLinks.cardmarket(selected)) } }
+                    }
+                    if (selected.variantId == LimitlessCards.VARIANT) {
+                        Text(
+                            "Not in TCGdex yet: picture and details from Limitless TCG, and the price is the international print's.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     if (selected.firstEdition) {
                         Text(

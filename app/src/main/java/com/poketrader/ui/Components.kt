@@ -665,6 +665,9 @@ fun CardDialog(
                         Text("#${selected.numberLabel} · ${selected.rarity}", style = MaterialTheme.typography.bodySmall)
                         if (selected.isJapanese) Text("Japanese print", style = MaterialTheme.typography.bodySmall)
                         if (selected.oversized) Text("Oversized (jumbo) card", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        if (selected.variantId == com.poketrader.data.LimitlessCards.VARIANT) {
+                            Text("From Limitless TCG · international print's price", style = MaterialTheme.typography.bodySmall)
+                        }
                         val selectedPrices = pricesOf(selected, data?.prices?.get(selected.cardmarketId))
                         Text(
                             Fmt.money(selectedPrices.best(priceType)),

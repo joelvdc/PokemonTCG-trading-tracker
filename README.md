@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.11.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.12.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.11-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.12-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -84,7 +84,14 @@ reverse holo" set it by hand, as before.
 ## Where the data comes from (no app updates needed for new sets)
 - **Cards, pictures, names in all languages:** [TCGdex](https://tcgdex.net) (free, open API), looked up live.
   International prints use TCGdex's English data (French/German/… prints share numbers and Cardmarket products);
-  Japanese prints are separate sets with their own ids and Cardmarket products.
+  Japanese prints are separate sets with their own ids and Cardmarket products. Korean and Chinese prints share the
+  Japanese sets' codes and numbers, so they're looked up there too.
+- **Japanese cards TCGdex is missing:** TCGdex lists many Japanese sets with no or only some cards (e.g. Pokémon GO
+  S10b, Eevee Heroes S6a, Shiny Treasure ex SV4a). For those the app reads the card's page on
+  [Limitless TCG](https://limitlesstcg.com): Japanese name, picture, and the matching international printing, whose
+  Cardmarket product gives the price (the cheapest international print, so not a full art). The card page says when
+  a card comes from Limitless; its price is the international print's, which can differ from the Japanese one. Pages
+  are kept on the phone for a month. Cards found in neither (e.g. Trading Card Game Classic, "CLV") can't be added.
 - **Prices:** Cardmarket's public daily Pokémon price guide (`price_guide_6.json`, ~15 MB), downloaded once a day.
   Each card *variant* (normal, reverse holo, Poké Ball / Master Ball pattern, stamped…) has its own Cardmarket
   product id in TCGdex; reverse holos use the guide's "holo" price columns.
@@ -117,6 +124,10 @@ reverse holo" set it by hand, as before.
   version exists. Jumbo cards TCGdex doesn't list can't be added.
 - The scanner identifies cards mainly by the printed number ("025/165") plus the name. Holo vs reverse holo can't be
   seen by the camera: use the "✨ Holo" toggle or tap a scanned card to change its version.
+- ex, V, VMAX, VSTAR and GX cards are recognised from the rule box at the bottom ("Pokémon ex rule"), since the
+  stylised logo next to the name is often misread. A card is only added from its number alone when the printed set
+  code confirms the set; otherwise the scanner shows pictures to pick from.
+- The camera can't read Korean (Hangul) text: Korean cards are found by their set code and number ("S6a 015/069").
 
 ## Rebuilding
 Same toolchain as the MTG Trader app next door: JDK 17+ and the Android SDK at `%USERPROFILE%\Android\sdk`.

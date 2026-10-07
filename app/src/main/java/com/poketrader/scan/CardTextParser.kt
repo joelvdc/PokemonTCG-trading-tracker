@@ -22,10 +22,18 @@ data class ScanClues(
     val total: Int?,
     /** Set code printed on newer cards: "SVI" (international) or "SV2a" (Japanese). */
     val setCode: String?,
-    /** Language code printed next to the set code on newer international cards ("EN", "FR"…), or "JA". */
+    /** Language code printed next to the set code on newer international cards ("EN", "FR"…), or "JA", "KO", "ZH". */
     val language: String?,
     val japanese: Boolean,
+    /**
+     * Printed like a Japanese card ("S6a 015/069") but not in Japanese: a Korean or Chinese print.
+     * Those share the Japanese sets' codes and numbers, so they're looked up there. Since 1.12.
+     */
+    val asian: Boolean = false,
 ) {
+    /** Japanese, Korean and Chinese cards are looked up in TCGdex's Japanese data. */
+    val dataLang get() = if (japanese || asian) "ja" else "en"
+
     val hasAnything get() = name != null || number != null
 }
 
@@ -54,8 +62,17 @@ object CardTextParser {
     // "SVI EN", "PAL FR", "OBF DE" — a space (or dot) is required so words don't match.
     private val setLangRe = Regex("""(?<![A-Z0-9])([A-Z]{2,4}\d?(?:\.\d)?)\s*[•·.]?\s+(EN|FR|DE|IT|ES|PT)(?![A-Z])""")
 
-    // Japanese cards print the set code just before the number: "SV2a 025/165".
-    private val jpSetRe = Regex("""(?<![A-Za-z0-9])([A-Z]{1,3}\d{0,2}[a-zA-Z]?)\s+[A-Z]{0,3}\d{1,3}\s*/""")
+    // Japanese cards print the set code just before the number: "SV2a 025/165", "S6a E 015/069" (with
+    // the regulation mark in between). Older international promos and TCG Classic print one too ("CLV 017/034").
+    private val jpSetRe = Regex("""(?<![A-Za-z0-9])([A-Za-z]{1,3}\d{0,2}[a-zA-Z]?)(?:\s+[A-H])?\s+[A-Z]{0,3}\d{1,3}\s*/""")
+
+    // Japanese-style set codes: S6a, s10b, SV4a, SM12a. OCR reads the 6 as "b" now and then ("Sba").
+    private val asianCodeRe = Regex("""^[A-H]?(?:SV|SM|S)[0-9bO]{1,2}[a-zA-Z]?$""", RegexOption.IGNORE_CASE)
+
+    // The rule box at the bottom of ex / V / GX cards names the kind of card, in every language
+    // ("Pokémon ex rule", "Règle des Pokémon-ex", "ポケモンex"…). OCR reads it far more reliably than
+    // the stylised "ex" logo next to the name.
+    private val ruleRe = Regex("""(?:pok[eé]mon|ポケモン)\s*-?\s*(ex|EX|GX|VSTAR|VMAX|V)(?![A-Za-z])|(?<![A-Za-z])(ex|GX|VSTAR|VMAX|V)\s*-?\s*(?:rule|regel|règle|regola|regla|regra)""", RegexOption.IGNORE_CASE)
 
     private val hpRe = Regex("""(?i)\bHP\s*\d+|\d+\s*HP\b""")
 
@@ -93,6 +110,10 @@ object CardTextParser {
             break
         }
 
+        // "ex" / "V"… from the rule box, added to the name when the logo next to it wasn't read.
+        val suffix = bottom.firstNotNullOfOrNull { l -> ruleRe.find(l.text)?.let { m -> m.groupValues[1].ifEmpty { m.groupValues[2] } } }?.let(::suffixCase)
+        val fullName = name?.let { n -> if (suffix == null || n.replace(" ", "").endsWith(suffix, ignoreCase = true)) n else if (japanese) n + suffix else "$n $suffix" }
+
         var setCode: String? = null
         var language: String? = null
         // Set code + language sit in the bottom-left corner; elsewhere it's flavour text.
@@ -104,13 +125,53 @@ object CardTextParser {
                 break
             }
         }
-        if (japanese) {
-            language = "JA"
-            setCode = numberLine?.let { jpSetRe.find(it)?.groupValues?.get(1) }
-        } else if (language == null) {
-            language = languageFromLabels(bottom)
+        val printedCode = numberLine?.let { jpSetRe.find(it)?.groupValues?.get(1) }
+        // A Japanese-style code without kana: Korean (the OCR can't read Hangul) or Chinese.
+        val asian = !japanese && setCode == null && printedCode != null && asianCodeRe.matches(printedCode) && languageFromLabels(bottom) == null
+        if (japanese || asian) {
+            language = when {
+                japanese -> "JA"
+                top.any { l -> l.text.any { it in '一'..'鿿' } } -> "ZH"
+                else -> "KO"
+            }
+            setCode = printedCode
+        } else {
+            if (printedCode != null && printedCode.uppercase() in printLanguages) {
+                if (language == null) language = printedCode.uppercase()
+            } else if (setCode == null) {
+                setCode = printedCode?.takeIf { c -> c.length >= 2 && c.any { it.isUpperCase() } }
+            }
+            if (language == null) language = languageFromLabels(bottom)
         }
-        return ScanClues(name, number, total, setCode, language, japanese)
+        return ScanClues(fullName, number, total, setCode, language, japanese, asian)
+    }
+
+    private val printLanguages = setOf("EN", "FR", "DE", "IT", "ES", "PT")
+
+    private fun suffixCase(s: String) = when (s.uppercase()) {
+        "EX" -> if (s == "EX") "EX" else "ex"
+        else -> s.uppercase()
+    }
+
+    /**
+     * How likely an OCR'd Japanese-style set code is [setId]: 1 for the same code, less for a near
+     * miss ("Sba" for S6a, "GS4s" for SV4a with the regulation mark glued on).
+     */
+    fun codeSimilarity(code: String, setId: String): Double {
+        fun norm(s: String) = s.uppercase().replace('B', '6').replace('O', '0')
+        val c = code.trim()
+        val tries = listOf(c, c.drop(1)).filter { it.length >= 2 }
+        val base = tries.maxOf { t -> similarity(norm(t), norm(setId)).let { s -> if (t.equals(setId, ignoreCase = true)) 1.0 else s } }
+        // A regulation mark glued to the code tells the era: G and later are Scarlet & Violet ("SV…"),
+        // D to F Sword & Shield ("S…").
+        val mark = c.firstOrNull()?.uppercaseChar()?.takeIf { c.length >= 4 && c[1].equals('S', ignoreCase = true) }
+        val sv = setId.startsWith("SV", ignoreCase = true)
+        val bonus = when (mark) {
+            in 'G'..'J' -> if (sv) 0.2 else 0.0
+            in 'D'..'F' -> if (!sv) 0.2 else 0.0
+            else -> 0.0
+        }
+        return if (base >= 1.0) 1.0 else minOf(0.99, base + bonus)
     }
 
     // Weakness / retreat labels are printed in the card's language and OCR reads them reliably.

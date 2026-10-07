@@ -185,7 +185,8 @@ class ScanController(
             try {
                 val result = recognizer.identify(clues)
                 if (result == null) {
-                    status = "Looking… ${clues.name ?: clues.number?.let { "#$it" } ?: ""}"
+                    status = recognizer.lastMissing?.let { "$it isn't in the card database (TCGdex) yet. Try Search by name." }
+                        ?: "Looking… ${clues.name ?: clues.number?.let { "#$it" } ?: ""}"
                     return@launch
                 }
                 lastSeen = SystemClock.elapsedRealtime()
@@ -401,6 +402,15 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
             onDismissRequest = { controller.dismissChoice() },
             title = { Text("Which ${ch.name} is it?") },
             text = {
+                Column {
+                ch.missing?.let {
+                    Text(
+                        "$it isn't in the card database (TCGdex) yet, so it can't be added as itself. Pick the closest card, or None of these.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 LazyVerticalGrid(columns = GridCells.Adaptive(96.dp), modifier = Modifier.heightIn(max = 480.dp)) {
                     items(ch.candidates, key = { it.brief.id }) { cand ->
                         Column(Modifier.clickable { controller.pick(cand.brief.id) }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -409,6 +419,7 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                             Text("#${cand.brief.localId}", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                }
                 }
             },
             confirmButton = {},
