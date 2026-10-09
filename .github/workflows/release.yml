@@ -1,13 +1,17 @@
-# Builds, signs and publishes a release when a version tag ("v1.13") is pushed.
+# Builds, signs and publishes a release. Three ways to start it:
+#   - "Run workflow" (Actions tab → Release, on main): releases versionName from app/build.gradle.kts as tag
+#     v<version>, with release-notes/<version>.md as the notes.
+#   - Creating a release on GitHub's website with a new tag v<version>: the APKs are added to that release.
+#   - Pushing a tag v<version>: as above, with the tag's message (or release-notes/<version>.md) as the notes.
 # Needs four repository secrets (Settings → Secrets and variables → Actions):
 #   KEYSTORE_BASE64    the release keystore file, base64-encoded
 #   KEYSTORE_PASSWORD  its store password
 #   KEY_ALIAS          the key's alias
 #   KEY_PASSWORD       the key's password
-# The release notes are the tag's message (git tag -a v1.13 -m "...").
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]
 
@@ -32,6 +36,17 @@ jobs:
           for s in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [ -z "${!s}" ]; then echo "::error::Repository secret $s is missing, so the release can't be signed."; exit 1; fi
           done
+
+      - name: Work out the version and tag
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "v$version" != "$GITHUB_REF_NAME" ]; then echo "::error::Tag $GITHUB_REF_NAME but versionName is $version"; exit 1; fi
+          elif git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already released; raise versionName first."; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=v$version" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -59,11 +74,10 @@ jobs:
       - name: Test and build
         run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
 
-      - name: Check the version matches the tag
+      - name: Check the APK is signed
         run: |
-          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then echo "::error::Tag $GITHUB_REF_NAME but versionName is $version"; exit 1; fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-universal-release.apk | head -3
 
       - name: Publish the release
         env:
@@ -72,9 +86,16 @@ jobs:
           out=app/build/outputs/apk/release
           cp "$out/app-arm64-v8a-release.apk" "PokeTrader-$VERSION.apk"
           cp "$out/app-universal-release.apk" "PokeTrader-$VERSION-universal.apk"
-          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > notes.md
-          gh release create "$GITHUB_REF_NAME" "PokeTrader-$VERSION.apk" "PokeTrader-$VERSION-universal.apk" \
-            --title "Poké Trader $VERSION" --notes-file notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Made on the website: keep its notes, add the APKs.
+            gh release upload "$TAG" "PokeTrader-$VERSION.apk" "PokeTrader-$VERSION-universal.apk" --clobber
+          else
+            notes="release-notes/$VERSION.md"
+            if [ ! -f "$notes" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then git tag -l --format='%(contents)' "$TAG" > tag-notes.md; notes=tag-notes.md; fi
+            if [ ! -s "$notes" ]; then echo "Poké Trader $VERSION" > empty-notes.md; notes=empty-notes.md; fi
+            gh release create "$TAG" "PokeTrader-$VERSION.apk" "PokeTrader-$VERSION-universal.apk" \
+              --target "$GITHUB_SHA" --title "Poké Trader $VERSION" --notes-file "$notes"
+          fi
 
       - name: Remove the keystore
         if: always()
