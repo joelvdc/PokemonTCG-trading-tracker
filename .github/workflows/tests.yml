@@ -1,4 +1,5 @@
-# Runs the unit tests and a debug build on every pull request, so problems show up before merging.
+# Runs the unit tests, compares the screenshot tests with app/src/test/screenshots and makes a debug
+# build on every pull request, so problems show up before merging.
 name: Tests
 
 on:
@@ -14,4 +15,10 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      - run: ./gradlew --no-daemon testDebugUnitTest verifyRoborazziDebug assembleDebug
+      # When a screen looks different, the new picture and a picture of the differences are kept here.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshot-differences
+          path: app/build/outputs/roborazzi/
