@@ -58,6 +58,10 @@ class CollectionQueryTest {
         assertTrue(Rarities.rank("Hyper rare") > Rarities.rank("Special illustration rare"))
         assertTrue(Rarities.rank("Special illustration rare") > Rarities.rank("Illustration rare"))
         assertTrue(Rarities.rank("Double rare") > Rarities.rank("Rare Holo"))
+        // Mega Evolution and 30th Celebration rarities (2026).
+        assertTrue(Rarities.rank("Mega Hyper Rare") > Rarities.rank("Special illustration rare"))
+        assertTrue(Rarities.rank("Futuristic Rare") > Rarities.rank("Special illustration rare"))
+        assertTrue(Rarities.rank("Pikachu Rare") > Rarities.rank("Rare"))
         assertTrue(Rarities.rank("Rare Holo") > Rarities.rank("Rare"))
         assertTrue(Rarities.rank("Rare") > Rarities.rank("Uncommon"))
         assertTrue(Rarities.rank("Uncommon") > Rarities.rank("Common"))

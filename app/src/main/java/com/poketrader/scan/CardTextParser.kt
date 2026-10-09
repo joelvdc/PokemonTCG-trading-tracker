@@ -59,15 +59,17 @@ object CardTextParser {
     // mark right before the number ("D136/189"), so a letter prefix only counts if the total has one too.
     private val numberRe = Regex("""(?<!\d)([A-Z]{0,3})(\d{1,3}[a-z]?)\s*/\s*([A-Z]{0,3})(\d{2,3})(?!\d)""")
 
-    // "SVI EN", "PAL FR", "OBF DE" — a space (or dot) is required so words don't match.
-    private val setLangRe = Regex("""(?<![A-Z0-9])([A-Z]{2,4}\d?(?:\.\d)?)\s*[•·.]?\s+(EN|FR|DE|IT|ES|PT)(?![A-Z])""")
+    // "SVI EN", "PAL FR", "OBF DE", "30C EN" (30th Celebration) — a space (or dot) is required so words don't match.
+    private val setLangRe = Regex("""(?<![A-Z0-9])([A-Z]{2,4}\d?(?:\.\d)?|\d{1,2}[A-Z]{1,2})\s*[•·.]?\s+(EN|FR|DE|IT|ES|PT)(?![A-Z])""")
 
-    // Japanese cards print the set code just before the number: "SV2a 025/165", "S6a E 015/069" (with
-    // the regulation mark in between). Older international promos and TCG Classic print one too ("CLV 017/034").
-    private val jpSetRe = Regex("""(?<![A-Za-z0-9])([A-Za-z]{1,3}\d{0,2}[a-zA-Z]?)(?:\s+[A-H])?\s+[A-Z]{0,3}\d{1,3}\s*/""")
+    // Japanese cards print the set code just before the number: "SV2a 025/165", "S6a E 015/069", "M2a J 015/080"
+    // (with the regulation mark in between; up to K leaves room for the next mark). Older international promos and
+    // TCG Classic print one too ("CLV 017/034").
+    private val jpSetRe = Regex("""(?<![A-Za-z0-9])([A-Za-z]{1,3}\d{0,2}[a-zA-Z]?)(?:\s+[A-K])?\s+[A-Z]{0,3}\d{1,3}\s*/""")
 
-    // Japanese-style set codes: S6a, s10b, SV4a, SM12a. OCR reads the 6 as "b" now and then ("Sba").
-    private val asianCodeRe = Regex("""^[A-H]?(?:SV|SM|S)[0-9bO]{1,2}[a-zA-Z]?$""", RegexOption.IGNORE_CASE)
+    // Japanese-style set codes: S6a, s10b, SV4a, SM12a and the Mega era's M1L, M2a, M3. OCR reads the 6 as "b" now
+    // and then ("Sba").
+    private val asianCodeRe = Regex("""^[A-K]?(?:SV|SM|S|M)[0-9bO]{1,2}[a-zA-Z]?$""", RegexOption.IGNORE_CASE)
 
     // The rule box at the bottom of ex / V / GX cards names the kind of card, in every language
     // ("Pokémon ex rule", "Règle des Pokémon-ex", "ポケモンex"…). OCR reads it far more reliably than
@@ -162,13 +164,17 @@ object CardTextParser {
         val c = code.trim()
         val tries = listOf(c, c.drop(1)).filter { it.length >= 2 }
         val base = tries.maxOf { t -> similarity(norm(t), norm(setId)).let { s -> if (t.equals(setId, ignoreCase = true)) 1.0 else s } }
-        // A regulation mark glued to the code tells the era: G and later are Scarlet & Violet ("SV…"),
-        // D to F Sword & Shield ("S…").
-        val mark = c.firstOrNull()?.uppercaseChar()?.takeIf { c.length >= 4 && c[1].equals('S', ignoreCase = true) }
+        // A regulation mark glued to the code tells the era: G and H are Scarlet & Violet ("SV…"), I is late
+        // Scarlet & Violet or early Mega ("M…"), J and K Mega, D to F Sword & Shield ("S…").
+        val second = c.getOrNull(1)?.uppercaseChar()
+        val mark = c.firstOrNull()?.uppercaseChar()?.takeIf { second == 'S' && c.length >= 4 || second == 'M' && c.length >= 3 }
         val sv = setId.startsWith("SV", ignoreCase = true)
+        val mega = setId.startsWith("M", ignoreCase = true)
         val bonus = when (mark) {
-            in 'G'..'J' -> if (sv) 0.2 else 0.0
-            in 'D'..'F' -> if (!sv) 0.2 else 0.0
+            in 'G'..'H' -> if (sv) 0.2 else 0.0
+            'I' -> if (sv || mega) 0.2 else 0.0
+            in 'J'..'K' -> if (mega) 0.2 else 0.0
+            in 'D'..'F' -> if (!sv && !mega) 0.2 else 0.0
             else -> 0.0
         }
         return if (base >= 1.0) 1.0 else minOf(0.99, base + bonus)

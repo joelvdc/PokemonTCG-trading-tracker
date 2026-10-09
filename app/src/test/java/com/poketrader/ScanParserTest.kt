@@ -96,4 +96,38 @@ class ScanParserTest {
         assertEquals("SVI", c.setCode)
         assertEquals("EN", c.language)
     }
+
+    @Test fun megaEraJapaneseCodeWithRegulationMarkJ() {
+        // Mega era: "M2a J 015/193". With marks only up to H, the J was taken for the set code.
+        val c = CardTextParser.parse(listOf(line("たね", 11, 11, 35), line("メガルカリオex", 30, 12, 65), line("M2a J 015/193", 19, 92)), guide)
+        assertEquals("M2a", c.setCode)
+        assertEquals("015", c.number)
+        assertEquals(193, c.total)
+        assertEquals("JA", c.language)
+    }
+
+    @Test fun megaEraKoreanPrintIsLookedUpInTheJapaneseSets() {
+        val c = CardTextParser.parse(listOf(line("-120", 79, 15, 86), line("M1L J 015/063", 23, 92, 48)), guide)
+        assertEquals("M1L", c.setCode)
+        assertTrue(c.asian)
+        assertEquals("KO", c.language)
+        assertEquals("ja", c.dataLang)
+    }
+
+    @Test fun regulationMarkGluedToAMegaCode() {
+        // "J M2a" read as "JM2a": the J says Mega, not Scarlet & Violet's SV2a.
+        assertTrue(CardTextParser.codeSimilarity("JM2a", "M2a") >= 0.5)
+        assertTrue(CardTextParser.codeSimilarity("JM2a", "M2a") > CardTextParser.codeSimilarity("JM2a", "SV2a"))
+        // I is used by both late Scarlet & Violet and early Mega sets.
+        assertTrue(CardTextParser.codeSimilarity("IM3", "M3") >= 0.5)
+        assertEquals(1.0, CardTextParser.codeSimilarity("M1S", "M1S"), 0.0)
+    }
+
+    @Test fun setCodeStartingWithDigits() {
+        // 30th Celebration prints "30C EN".
+        val c = CardTextParser.parse(listOf(line("Mew ex", 30, 5, 60), line("Pokémon ex rule", 53, 87), line("30C EN 158/128", 20, 94)), guide)
+        assertEquals("30C", c.setCode)
+        assertEquals("EN", c.language)
+        assertFalse(c.asian)
+    }
 }
