@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.13.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.14.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.13-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.14-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -50,6 +50,7 @@ CSV backup.
 
 **Value over time:** tap the total above the cards (or ⋮ → Value over time). The app saves the collection's value once
 a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately (tap one to open it).
+The chips at the top switch between all cards, Unsorted and each binder (binder values are saved from version 1.14 on).
 
 **Collection stats:** the pie-chart button next to the total (or ⋮ → Collection stats). For all cards or one binder,
 counted by cards or by value: totals (and what you paid against what those cards are worth now), rarity (rarest

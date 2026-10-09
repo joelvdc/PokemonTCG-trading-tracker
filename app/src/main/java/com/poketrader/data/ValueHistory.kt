@@ -17,7 +17,8 @@ data class PriceMove(val row: CollectionRow, val change: Double, val pct: Double
 /**
  * The collection's value over time: once a day (when the app opens and after each price update)
  * the total is worked out for every price type and kept, so switching the price type keeps the
- * history. Since 1.9.
+ * history. Since 1.9. Each binder's value is kept too (since 1.14), as extra "b:<binder>:<type>" entries
+ * that older versions ignore.
  */
 class ValueHistory(private val db: AppDatabase) {
     private val dao = db.valueHistoryDao()
@@ -27,19 +28,43 @@ class ValueHistory(private val db: AppDatabase) {
         if (db.priceDao().countNow() == 0) return
         val rows = db.collectionDao().allWithPrices()
         if (rows.isEmpty()) return
-        val values = JsonObject(PriceType.entries.associate { t -> t.key to JsonPrimitive(totalValue(rows, t)) })
+        val binders = db.binderDao().all().map { it.id } + Binder.UNSORTED
+        val values = JsonObject(snapshotValues(rows, binders).mapValues { JsonPrimitive(it.value) })
         dao.put(ValueSnapshot(today.toString(), rows.sumOf { it.item.quantity }, values.toString()))
     }
 
-    fun observe(type: PriceType): Flow<List<ValuePoint>> = dao.observeAll().map { rows ->
+    /** The whole collection's value per day, or one [binder]'s (days before 1.14 have no binder values). */
+    fun observe(type: PriceType, binder: Long? = null): Flow<List<ValuePoint>> = dao.observeAll().map { rows ->
         rows.mapNotNull { r ->
-            val v = runCatching { (Json.parseToJsonElement(r.values) as JsonObject)[type.key] as? JsonPrimitive }.getOrNull()?.doubleOrNull
-                ?: return@mapNotNull null
-            ValuePoint(LocalDate.parse(r.day), v, r.cards)
+            val values = runCatching {
+                (Json.parseToJsonElement(r.values) as JsonObject).mapNotNull { (k, v) -> (v as? JsonPrimitive)?.doubleOrNull?.let { k to it } }.toMap()
+            }.getOrNull() ?: return@mapNotNull null
+            point(LocalDate.parse(r.day), r.cards, values, type, binder)
         }
     }
 
     companion object {
+        fun binderKey(binder: Long, what: String) = "b:$binder:$what"
+
+        /** A day's numbers: the total per price type, and per binder its card count and value per price type. */
+        fun snapshotValues(rows: List<CollectionRow>, binders: List<Long>): Map<String, Double> {
+            val out = LinkedHashMap<String, Double>()
+            PriceType.entries.forEach { t -> out[t.key] = totalValue(rows, t) }
+            val byBinder = rows.groupBy { it.item.binderId }
+            // Every binder, an empty one too, so its chart drops to zero instead of stopping.
+            for (b in (binders + byBinder.keys).distinct()) {
+                val rs = byBinder[b].orEmpty()
+                out[binderKey(b, "cards")] = rs.sumOf { it.item.quantity }.toDouble()
+                PriceType.entries.forEach { t -> out[binderKey(b, t.key)] = totalValue(rs, t) }
+            }
+            return out
+        }
+
+        /** Reads one point back from a day's numbers; null when the day has none for [binder]. */
+        fun point(day: LocalDate, cards: Int, values: Map<String, Double>, type: PriceType, binder: Long?): ValuePoint? =
+            if (binder == null) values[type.key]?.let { ValuePoint(day, it, cards) }
+            else values[binderKey(binder, type.key)]?.let { v -> ValuePoint(day, v, values[binderKey(binder, "cards")]?.toInt() ?: 0) }
+
         fun totalValue(rows: List<CollectionRow>, type: PriceType) = rows.sumOf { (it.unitPrice(type) ?: 0.0) * it.item.quantity }
 
         /** The cards that gained (or lost) the most value lately, in EUR over all copies you own. */
