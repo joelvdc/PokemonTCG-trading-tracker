@@ -1,0 +1,81 @@
+# Builds, signs and publishes a release when a version tag ("v1.13") is pushed.
+# Needs four repository secrets (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64    the release keystore file, base64-encoded
+#   KEYSTORE_PASSWORD  its store password
+#   KEY_ALIAS          the key's alias
+#   KEY_PASSWORD       the key's password
+# The release notes are the tag's message (git tag -a v1.13 -m "...").
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for s in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!s}" ]; then echo "::error::Repository secret $s is missing, so the release can't be signed."; exit 1; fi
+          done
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Write the keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          mkdir -p keystore
+          echo "$KEYSTORE_BASE64" | base64 -d > keystore/release.jks
+          {
+            echo "storeFile=keystore/release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > keystore.properties
+
+      - name: Test and build
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+
+      - name: Check the version matches the tag
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then echo "::error::Tag $GITHUB_REF_NAME but versionName is $version"; exit 1; fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          out=app/build/outputs/apk/release
+          cp "$out/app-arm64-v8a-release.apk" "PokeTrader-$VERSION.apk"
+          cp "$out/app-universal-release.apk" "PokeTrader-$VERSION-universal.apk"
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > notes.md
+          gh release create "$GITHUB_REF_NAME" "PokeTrader-$VERSION.apk" "PokeTrader-$VERSION-universal.apk" \
+            --title "Poké Trader $VERSION" --notes-file notes.md
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -rf keystore keystore.properties
