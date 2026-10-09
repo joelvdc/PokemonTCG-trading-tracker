@@ -118,61 +118,83 @@ fun StatsScreen(nav: NavController) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             return@Scaffold
         }
-        LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item(key = "binders") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    item { FilterChip(selected = binder == null, onClick = { binder = null }, label = { Text("All cards") }) }
-                    item { FilterChip(selected = binder == Binder.UNSORTED, onClick = { binder = Binder.UNSORTED }, label = { Text(Binder.UNSORTED_NAME) }) }
-                    items(binders, key = { it.id }) { b -> FilterChip(selected = binder == b.id, onClick = { binder = b.id }, label = { Text(b.name) }) }
-                }
-            }
-            item(key = "overview") { Overview(s, priceType) }
-            if (s.copies == 0) return@LazyColumn
-            item(key = "mode") {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    StatMode.entries.forEachIndexed { i, m ->
-                        SegmentedButton(selected = mode == m, onClick = { mode = m }, shape = SegmentedButtonDefaults.itemShape(i, StatMode.entries.size)) {
-                            Text("Charts by ${m.label.lowercase()}")
-                        }
-                    }
-                }
-            }
-            item(key = "rarity") {
-                Section("Rarity", "Rarest first. Tap a line to see those cards.") { Bars(s.rarities, mode, keepOrder = true, limit = 8, onPick = ::show) }
-            }
-            item(key = "completion") {
-                Section("Set completion", "Different card numbers you own out of the set's official count; \"+2\" are secret rares beyond it.") {
-                    Completion(s.completion, limit = 8, onPick = ::show)
-                }
-            }
-            item(key = "eras") {
-                Section("Era", if (eras.isEmpty()) "The list of eras couldn't be loaded yet (it needs the internet once)." else "The series each card's set belongs to, oldest first.") {
-                    Bars(s.eras, mode, keepOrder = true, onPick = ::show)
-                }
-            }
-            if (s.kinds.isNotEmpty()) {
-                item(key = "kinds") { Section("Special Pokémon", "ex, V, GX, Mega and the like, read from the card names.") { Bars(s.kinds, mode) {} } }
-            }
-            item(key = "pokemon") {
-                Section("Most collected Pokémon", "By name: Pikachu ex and Pikachu V count as Pikachu. Energy is left out.") {
-                    Bars(s.pokemon, mode, limit = 10, onPick = ::show)
-                }
-            }
-            item(key = "prices") { Section("Price of one card", "Cards without a price aren't counted.") { Bars(s.priceRanges, mode, keepOrder = true, onPick = ::show) } }
-            item(key = "sets") { Section("Top sets") { Bars(s.topSets, mode, limit = 8, onPick = ::show) } }
-            item(key = "versions") { Section("Version", "Normal, holo, reverse holo, special foils, stamps…") { Bars(s.versions, mode, limit = 8, onPick = ::show) } }
-            if (s.prints.size > 1) item(key = "prints") { Section("Print") { Bars(s.prints, mode, keepOrder = true, onPick = ::show) } }
-            if (s.languages.size > 1) item(key = "languages") { Section("Language") { Bars(s.languages, mode, limit = 6, onPick = ::show) } }
-            item(key = "conditions") { Section("Condition") { Bars(s.conditions, mode, keepOrder = true, onPick = ::show) } }
-            if (binder == null && s.binders.size > 1) item(key = "binderValue") { Section("Binders") { Bars(s.binders, mode, onPick = ::show) } }
-            item(key = "added") { Section("Cards added", "The last 12 months.") { Columns(s.added, mode) } }
-            item(key = "valuable") {
-                Section("Most valuable", "Tap a card to open it.") { CardList(s.mostValuable, priceType) { opened = it } }
-            }
-        }
+        StatsContent(
+            s, priceType, binders, binder, { binder = it }, mode, { mode = it }, erasLoaded = eras.isNotEmpty(),
+            onPick = ::show, onOpen = { opened = it }, modifier = Modifier.padding(pad),
+        )
     }
 
     opened?.let { row -> CollectionCardDialog(row, nav, snackbar, scope) { opened = null } }
+}
+
+/** The stats themselves, drawn from [s]; split from [StatsScreen] so screenshot tests can show it. Since 1.14. */
+@Composable
+fun StatsContent(
+    s: CollectionStatsResult,
+    priceType: PriceType,
+    binders: List<Binder>,
+    binder: Long?,
+    onBinder: (Long?) -> Unit,
+    mode: StatMode,
+    onMode: (StatMode) -> Unit,
+    erasLoaded: Boolean,
+    onPick: (CollectionJump?) -> Unit,
+    onOpen: (CollectionRow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val show = onPick
+    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item(key = "binders") {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item { FilterChip(selected = binder == null, onClick = { onBinder(null) }, label = { Text("All cards") }) }
+                item { FilterChip(selected = binder == Binder.UNSORTED, onClick = { onBinder(Binder.UNSORTED) }, label = { Text(Binder.UNSORTED_NAME) }) }
+                items(binders, key = { it.id }) { b -> FilterChip(selected = binder == b.id, onClick = { onBinder(b.id) }, label = { Text(b.name) }) }
+            }
+        }
+        item(key = "overview") { Overview(s, priceType) }
+        if (s.copies == 0) return@LazyColumn
+        item(key = "mode") {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                StatMode.entries.forEachIndexed { i, m ->
+                    SegmentedButton(selected = mode == m, onClick = { onMode(m) }, shape = SegmentedButtonDefaults.itemShape(i, StatMode.entries.size)) {
+                        Text("Charts by ${m.label.lowercase()}")
+                    }
+                }
+            }
+        }
+        item(key = "rarity") {
+            Section("Rarity", "Rarest first. Tap a line to see those cards.") { Bars(s.rarities, mode, keepOrder = true, limit = 8, onPick = show) }
+        }
+        item(key = "completion") {
+            Section("Set completion", "Different card numbers you own out of the set's official count; \"+2\" are secret rares beyond it.") {
+                Completion(s.completion, limit = 8, onPick = show)
+            }
+        }
+        item(key = "eras") {
+            Section("Era", if (!erasLoaded) "The list of eras couldn't be loaded yet (it needs the internet once)." else "The series each card's set belongs to, oldest first.") {
+                Bars(s.eras, mode, keepOrder = true, onPick = show)
+            }
+        }
+        if (s.kinds.isNotEmpty()) {
+            item(key = "kinds") { Section("Special Pokémon", "ex, V, GX, Mega and the like, read from the card names.") { Bars(s.kinds, mode) {} } }
+        }
+        item(key = "pokemon") {
+            Section("Most collected Pokémon", "By name: Pikachu ex and Pikachu V count as Pikachu. Energy is left out.") {
+                Bars(s.pokemon, mode, limit = 10, onPick = show)
+            }
+        }
+        item(key = "prices") { Section("Price of one card", "Cards without a price aren't counted.") { Bars(s.priceRanges, mode, keepOrder = true, onPick = show) } }
+        item(key = "sets") { Section("Top sets") { Bars(s.topSets, mode, limit = 8, onPick = show) } }
+        item(key = "versions") { Section("Version", "Normal, holo, reverse holo, special foils, stamps…") { Bars(s.versions, mode, limit = 8, onPick = show) } }
+        if (s.prints.size > 1) item(key = "prints") { Section("Print") { Bars(s.prints, mode, keepOrder = true, onPick = show) } }
+        if (s.languages.size > 1) item(key = "languages") { Section("Language") { Bars(s.languages, mode, limit = 6, onPick = show) } }
+        item(key = "conditions") { Section("Condition") { Bars(s.conditions, mode, keepOrder = true, onPick = show) } }
+        if (binder == null && s.binders.size > 1) item(key = "binderValue") { Section("Binders") { Bars(s.binders, mode, onPick = show) } }
+        item(key = "added") { Section("Cards added", "The last 12 months.") { Columns(s.added, mode) } }
+        item(key = "valuable") {
+            Section("Most valuable", "Tap a card to open it.") { CardList(s.mostValuable, priceType, onOpen) }
+        }
+    }
 }
 
 @Composable

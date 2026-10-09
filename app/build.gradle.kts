@@ -6,6 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    // Screenshot tests: screens drawn on the computer (Robolectric), compared with app/src/test/screenshots.
+    id("io.github.takahirom.roborazzi")
 }
 
 val keystoreProps = Properties().apply {
@@ -67,6 +69,16 @@ android {
             isUniversalApk = true
         }
     }
+    testOptions {
+        unitTests {
+            // Robolectric (screenshot tests) needs the app's resources.
+            isIncludeAndroidResources = true
+            all { test ->
+                // Robolectric downloads its Android jars from Maven Central; a mirror can be given instead.
+                System.getenv("ROBOLECTRIC_REPO")?.let { test.systemProperty("robolectric.dependency.repo.url", it) }
+            }
+        }
+    }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -110,7 +122,18 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.39.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.39.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.room:room-testing:2.6.1")
+}
+
+roborazzi {
+    // Reference screenshots live with the tests, so changes to them show up in pull requests.
+    outputDir.set(file("src/test/screenshots"))
 }

@@ -156,6 +156,16 @@ Tests: `gradlew testDebugUnitTest` (logic, parser, variants) and `gradlew connec
 card images in `app/src/androidTest/assets`, needs a device/emulator with internet; plus editing scanned cards against
 an in-memory database).
 
+## Screenshot tests
+`app/src/test/java/com/poketrader/ScreenshotTest.kt` draws screens with sample cards on the computer (Robolectric and
+Roborazzi, no phone or emulator) and compares them with the pictures in `app/src/test/screenshots`. Every pull request
+runs the comparison; when a screen looks different, the new picture and a picture of the differences are attached to
+the failed run ("screenshot-differences").
+```
+gradlew verifyRoborazziDebug   (compare the screens with the pictures)
+gradlew recordRoborazziDebug   (redraw the pictures after an intended change, then commit them)
+```
+
 ## Code map
 - `data/Tcgdex.kt` – TCGdex client, variant naming, card → printings.
 - `data/SetCatalog.kt` – cached set lists (for "/165 → which set?"), Pocket filter, eras for the stats.

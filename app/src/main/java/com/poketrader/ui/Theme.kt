@@ -86,5 +86,11 @@ fun PokeTheme(content: @Composable () -> Unit) {
             }
         }
     }
+    PokeColors(dark, content)
+}
+
+/** The app's light or dark colours, without reading the theme setting; also used by the screenshot tests. Since 1.14. */
+@Composable
+fun PokeColors(dark: Boolean, content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (dark) Dark else Light, content = content)
 }
