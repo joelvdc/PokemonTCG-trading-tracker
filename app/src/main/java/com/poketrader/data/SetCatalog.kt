@@ -83,7 +83,35 @@ class SetCatalog(context: Context, private val api: TcgdexApi) {
         return detail?.abbreviation?.official
     }
 
+    /**
+     * Set id → its series ("era") for the collection stats, built from TCGdex's series once a week and
+     * kept on disk; an empty map when it can't be loaded. Since 1.13.
+     */
+    suspend fun eras(lang: String): Map<String, Era> {
+        val file = File(dir, "eras_$lang.tsv")
+        val cached = withContext(Dispatchers.IO) { if (file.exists()) decodeEras(file.readText()) else emptyMap() }
+        val fresh = file.exists() && System.currentTimeMillis() - file.lastModified() < 7L * 24 * 3600 * 1000
+        if (cached.isNotEmpty() && fresh) return cached
+        val loaded = runCatching {
+            val out = HashMap<String, Era>()
+            api.series(lang).forEachIndexed { i, s ->
+                if (s.id == "tcgp") return@forEachIndexed
+                for (setId in api.serieSetIds(s.id, lang)) out[setId] = Era(s.name.ifBlank { s.id }, i)
+            }
+            out
+        }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return cached
+        withContext(Dispatchers.IO) { file.writeText(encodeEras(loaded)) }
+        return loaded
+    }
+
     companion object {
+        fun encodeEras(eras: Map<String, Era>): String = eras.entries.joinToString("\n") { (id, e) -> "$id\t${e.order}\t${e.name}" }
+
+        fun decodeEras(text: String): Map<String, Era> = text.lineSequence().mapNotNull { line ->
+            val p = line.split('\t')
+            if (p.size == 3) p[1].toIntOrNull()?.let { p[0] to Era(p[2], it) } else null
+        }.toMap()
+
         // Fallback when offline: Pocket set ids look like "A1", "A2b", "B1a", "P-A".
         private val POCKET_ID = Regex("""^(A\d+[a-z]?|B\d+[a-z]?|P-[AB])$""")
     }

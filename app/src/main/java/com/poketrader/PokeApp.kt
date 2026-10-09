@@ -7,6 +7,7 @@ import coil.ImageLoaderFactory
 import coil.util.DebugLogger
 import com.poketrader.data.AppDatabase
 import com.poketrader.data.CardmarketCatalog
+import com.poketrader.data.CollectionJump
 import com.poketrader.data.DataUpdater
 import com.poketrader.data.FallbackImageSets
 import com.poketrader.data.LimitlessCards
@@ -22,6 +23,7 @@ import com.poketrader.data.ValueHistory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -67,6 +69,8 @@ class AppContainer(context: Context) {
         tcgdex.missingJapanese = { setId, number -> l.card(setId, number) }
     }
     val history = ValueHistory(db)
+    /** Set by the stats screen; the collection shows these cards when it next appears. Since 1.13. */
+    val collectionJump = MutableStateFlow<CollectionJump?>(null)
     val updater = DataUpdater(context, settings, prices, catalog, repo, network, history)
 
     /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
