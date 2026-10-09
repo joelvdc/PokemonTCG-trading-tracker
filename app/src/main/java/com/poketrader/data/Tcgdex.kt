@@ -228,6 +228,10 @@ fun variantLabel(v: TcgVariant): String {
 @Serializable
 private data class TcgSerie(val id: String, val sets: List<TcgSetBrief> = emptyList())
 
+/** One TCGdex series ("Scarlet & Violet"…), as listed by /series. Since 1.13. */
+@Serializable
+data class TcgSerieBrief(val id: String, val name: String = "")
+
 @Serializable
 private data class TcgSetCards(val id: String = "", val cards: List<TcgBrief> = emptyList())
 
@@ -329,6 +333,12 @@ class TcgdexApi(private val http: OkHttpClient) {
     suspend fun sets(lang: String): List<TcgSetBrief> {
         val body = call(url(lang, "sets")) ?: return emptyList()
         return json.decodeFromString<List<TcgSetBrief>>(body)
+    }
+
+    /** Every series, oldest first. Since 1.13. */
+    suspend fun series(lang: String): List<TcgSerieBrief> {
+        val body = call(url(lang, "series")) ?: return emptyList()
+        return json.decodeFromString<List<TcgSerieBrief>>(body)
     }
 
     /** Set ids of one series, e.g. "tcgp" (Pokémon TCG Pocket, a digital-only game). */

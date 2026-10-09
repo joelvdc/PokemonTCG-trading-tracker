@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -137,6 +138,16 @@ fun CollectionScreen(nav: NavController) {
     var creating by remember { mutableStateOf(false) }
     var merging by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+
+    // The stats screen asked to show some cards (a tapped bar or slice).
+    val jump by c.collectionJump.collectAsStateWithLifecycle()
+    LaunchedEffect(jump) {
+        val j = jump ?: return@LaunchedEffect
+        c.collectionJump.value = null
+        selected = j.binder
+        filter = j.search
+        filterText = if (j.filter.isEmpty) "" else j.filter.encode()
+    }
 
     // A deleted binder (or one merged away) drops back to "All".
     LaunchedEffect(binders, selected) {
@@ -271,6 +282,11 @@ fun CollectionScreen(nav: NavController) {
                             onClick = { menu = false; nav.navigate("value") },
                         )
                         if (!wish) DropdownMenuItem(
+                            text = { Text("Collection stats") },
+                            leadingIcon = { Icon(Icons.Default.PieChart, null) },
+                            onClick = { menu = false; nav.navigate("stats") },
+                        )
+                        if (!wish) DropdownMenuItem(
                             text = { Text(if (selected == null) "Export (CSV backup)" else "Export this binder (CSV)") },
                             leadingIcon = { Icon(Icons.Default.FileDownload, null) },
                             onClick = {
@@ -398,7 +414,12 @@ fun CollectionScreen(nav: NavController) {
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                if (!wish) Icon(Icons.AutoMirrored.Filled.ShowChart, "Value over time", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                if (!wish) {
+                    Icon(Icons.AutoMirrored.Filled.ShowChart, "Value over time", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                    IconButton(onClick = { nav.navigate("stats") }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.PieChart, "Collection stats", Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
             SearchField(filter, { filter = it }, "Find a card", Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
             if (!cardFilter.isEmpty) {

@@ -59,11 +59,13 @@ object Rarities {
         return when {
             r.isBlank() || r == "none" -> 0
             "special illustration" in r -> 90
-            "hyper" in r || "gold" in r || "secret" in r || "crown" in r -> 95
+            // "Futuristic Rare" is the 30th Celebration set's top card (Mew ex).
+            "hyper" in r || "gold" in r || "secret" in r || "crown" in r || "futuristic" in r -> 95
             "illustration" in r -> 80
             "shiny" in r -> 75
             "ultra" in r || "full art" in r -> 70
-            "ace" in r || "double" in r || "amazing" in r || "radiant" in r -> 60
+            // "Pikachu Rare": 30th Celebration's Pikachu cards, a step above a plain Rare.
+            "ace" in r || "double" in r || "amazing" in r || "radiant" in r || "pikachu" in r -> 60
             " v" in r || "vmax" in r || "vstar" in r || " ex" in r || " gx" in r || "break" in r || "prime" in r || "legend" in r -> 55
             "holo" in r -> 40
             "promo" in r -> 35

@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.12.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.13.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.12-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.13-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -50,6 +50,14 @@ CSV backup.
 
 **Value over time:** tap the total above the cards (or ⋮ → Value over time). The app saves the collection's value once
 a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately (tap one to open it).
+
+**Collection stats:** the pie-chart button next to the total (or ⋮ → Collection stats). For all cards or one binder,
+counted by cards or by value: totals (and what you paid against what those cards are worth now), rarity (rarest
+first), **set completion** (how many of a set's official numbers you own, plus secret rares beyond them), era (the
+TCGdex series: Base, Scarlet & Violet, Mega Evolution…), special Pokémon (ex, V, VMAX, GX, Mega, Radiant… read from
+the names), the Pokémon you have most of (Pikachu ex counts as Pikachu), price of one card, top sets, version, print,
+language, condition, binders, cards added per month and the most valuable cards. Tap a line to see those cards in
+the collection, or a valuable card to open it.
 
 Add cards with the big **+ Add card** button (search by name) or the camera button above it (scanner).
 
@@ -127,7 +135,10 @@ reverse holo" set it by hand, as before.
 - ex, V, VMAX, VSTAR and GX cards are recognised from the rule box at the bottom ("Pokémon ex rule"), since the
   stylised logo next to the name is often misread. A card is only added from its number alone when the printed set
   code confirms the set; otherwise the scanner shows pictures to pick from.
-- The camera can't read Korean (Hangul) text: Korean cards are found by their set code and number ("S6a 015/069").
+- The camera can't read Korean (Hangul) text: Korean cards are found by their set code and number ("S6a 015/069",
+  "M2a 015/193").
+- 30th Celebration (2026): TCGdex doesn't link these cards to Cardmarket yet, and Cardmarket lists them in several
+  look-alike expansions, so they show no price until TCGdex adds the links (the app doesn't guess between them).
 
 ## Rebuilding
 Same toolchain as the MTG Trader app next door: JDK 17+ and the Android SDK at `%USERPROFILE%\Android\sdk`.
@@ -147,7 +158,8 @@ an in-memory database).
 
 ## Code map
 - `data/Tcgdex.kt` – TCGdex client, variant naming, card → printings.
-- `data/SetCatalog.kt` – cached set lists (for "/165 → which set?"), Pocket filter.
+- `data/SetCatalog.kt` – cached set lists (for "/165 → which set?"), Pocket filter, eras for the stats.
+- `data/CollectionStats.kt` – the numbers behind the stats screen (`ui/StatsScreen.kt`).
 - `data/PriceGuideRepository.kt` – Cardmarket price guide download/import.
 - `data/Repository.kt` – trades, collection, apply/undo, CSV.
 - `scan/CardTextParser.kt` – reads name / number / set code / language from OCR lines.

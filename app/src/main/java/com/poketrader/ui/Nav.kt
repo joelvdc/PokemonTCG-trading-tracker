@@ -133,6 +133,7 @@ fun AppNav() {
             composable("scans") { ScansScreen(nav) }
             composable("settings") { SettingsScreen() }
             composable("value") { ValueScreen(nav) }
+            composable("stats") { StatsScreen(nav) }
             composable("trade/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                 TradeEditorScreen(nav, it.arguments?.getLong("id") ?: 0L)
             }
