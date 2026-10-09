@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.poketrader.container
+import com.poketrader.data.Binder
 import com.poketrader.data.CollectionRow
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.SnackbarHost
@@ -66,8 +68,12 @@ private enum class ValueRange(val label: String, val days: Long?) { MONTH("1 mon
 fun ValueScreen(nav: NavController) {
     val c = LocalContext.current.container
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
-    val history by remember(priceType) { c.history.observe(priceType) }.collectAsStateWithLifecycle(emptyList())
-    val rows by remember { c.db.collectionDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
+    val binders = rememberBinders()
+    // null is the whole collection; since 1.14 one binder can be shown.
+    var binder by rememberSaveable { mutableStateOf<Long?>(null) }
+    val history by remember(priceType, binder) { c.history.observe(priceType, binder) }.collectAsStateWithLifecycle(emptyList())
+    val allRows by remember { c.db.collectionDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
+    val rows = remember(allRows, binder) { if (binder == null) allRows else allRows.filter { it.item.binderId == binder } }
     var range by rememberSaveable { mutableStateOf(ValueRange.QUARTER) }
     val now = remember(rows, priceType) { ValueHistory.totalValue(rows, priceType) }
     val points = remember(history, range) {
@@ -91,6 +97,15 @@ fun ValueScreen(nav: NavController) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
         LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (binders.isNotEmpty()) {
+                item(key = "binders") {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        item { FilterChip(selected = binder == null, onClick = { binder = null }, label = { Text("All cards") }) }
+                        item { FilterChip(selected = binder == Binder.UNSORTED, onClick = { binder = Binder.UNSORTED }, label = { Text(Binder.UNSORTED_NAME) }) }
+                        items(binders, key = { it.id }) { b -> FilterChip(selected = binder == b.id, onClick = { binder = b.id }, label = { Text(b.name) }) }
+                    }
+                }
+            }
             item(key = "now") {
                 Column {
                     Text(Fmt.money(now), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
@@ -118,7 +133,8 @@ fun ValueScreen(nav: NavController) {
             item(key = "chart") {
                 if (points.size < 2) {
                     Text(
-                        "The app saves your collection's value once a day (when it opens and after each price update), " +
+                        (if (binder == null) "The app saves your collection's value once a day (when it opens and after each price update), "
+                        else "The app saves each binder's value once a day since version 1.14, ") +
                             "so the chart fills in as the days go by." + if (history.size == 1) " First value saved ${shortDate(history.first().day)}." else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
