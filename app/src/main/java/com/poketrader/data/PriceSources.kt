@@ -121,12 +121,13 @@ class PriceSourceStore(context: Context, private val db: AppDatabase, private va
     private val dao = db.sourcePriceDao()
     private val prefs = context.getSharedPreferences("price_sources", Context.MODE_PRIVATE)
     private val lock = Mutex()
-    private val _status = MutableStateFlow(Status(prefs.getLong(K_AT, 0)))
+    private val _status = MutableStateFlow(Status(prefs.getLong(K_AT, 0), error = prefs.getString(K_ERR, null)))
     val status: StateFlow<Status> = _status
 
     data class Status(val tcgplayerAt: Long = 0, val running: Boolean = false, val done: Int = 0, val total: Int = 0, val error: String? = null)
 
-    val isStale get() = System.currentTimeMillis() - prefs.getLong(K_AT, 0) > MAX_AGE_MS
+    /** Once a day; after a failed try, not again for [RETRY_MS] (since 1.17). */
+    val isStale get() = isDue(prefs.getLong(K_AT, 0), prefs.getLong(K_FAIL, 0), System.currentTimeMillis())
 
     private suspend fun ownedCards(): List<CardRef> {
         val d = db
@@ -164,16 +165,27 @@ class PriceSourceStore(context: Context, private val db: AppDatabase, private va
         for ((i, id) in ids.withIndex()) {
             // cardAsIs passes the card to fromTcgdex (see AppContainer).
             if (runCatching { tcgdex.cardAsIs(id, "en") }.isFailure) failed++
-            if (i % 20 == 0) _status.value = _status.value.copy(done = i)
+            if (i % 5 == 0) _status.value = _status.value.copy(done = i + 1)
         }
-        if (failed < ids.size || ids.isEmpty()) prefs.edit().putLong(K_AT, start).apply()
+        val error = if (failed > 0) "$failed of ${ids.size} cards couldn't be read" else null
+        prefs.edit().apply {
+            if (failed < ids.size || ids.isEmpty()) putLong(K_AT, start).remove(K_FAIL) else putLong(K_FAIL, start)
+            if (error != null) putString(K_ERR, error) else remove(K_ERR)
+        }.apply()
         loadOwned()
-        _status.value = Status(prefs.getLong(K_AT, 0), error = if (failed > 0) "$failed of ${ids.size} cards couldn't be read" else null)
+        _status.value = Status(prefs.getLong(K_AT, 0), error = error)
         failed == 0
     }
 
-    private companion object {
-        const val K_AT = "tcgplayerAt"
-        const val MAX_AGE_MS = 20L * 60 * 60 * 1000
+    companion object {
+        private const val K_AT = "tcgplayerAt"
+        private const val K_FAIL = "tcgplayerFailedAt"
+        private const val K_ERR = "tcgplayerError"
+        private const val MAX_AGE_MS = 20L * 60 * 60 * 1000
+        /** After a failed automatic download, wait this long before trying again. */
+        const val RETRY_MS = 6L * 60 * 60 * 1000
+
+        /** Due when the last download is over [MAX_AGE_MS] old and the last failed try over [RETRY_MS]. */
+        fun isDue(lastOk: Long, lastFailed: Long, now: Long) = now - lastOk > MAX_AGE_MS && now - lastFailed > RETRY_MS
     }
 }

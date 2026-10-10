@@ -143,7 +143,7 @@ fun SettingsScreen() {
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { c.appScope.launch { c.updater.updateNow() } },
-                enabled = state !is PriceUpdateState.Running && catalogState !is PriceUpdateState.Running,
+                enabled = state !is PriceUpdateState.Running && catalogState !is PriceUpdateState.Running && !sourceStatus.running,
             ) { Text("Update now") }
             Spacer(Modifier.height(12.dp))
             SwitchRow(
@@ -272,7 +272,7 @@ internal fun PriceSourceSection(source: PriceSource, status: com.poketrader.data
         when {
             status.running -> "Getting TCGplayer's prices… ${status.done} of ${status.total} cards"
             status.tcgplayerAt == 0L -> "TCGplayer's prices download with the next price update (one card at a time, about a minute per 1,000 cards)."
-            else -> "TCGplayer's prices last downloaded ${Fmt.dateTime(status.tcgplayerAt)}"
+            else -> "TCGplayer's prices last downloaded ${Fmt.dateTime(status.tcgplayerAt)}; they download once a day, with Cardmarket's."
         },
         style = MaterialTheme.typography.bodySmall,
         color = if (status.running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
