@@ -115,7 +115,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
         value = Versions(printings, c.prices.pricesFor(printings.mapNotNull { it.cardmarketId }))
     }
     val prices = if (selected == item.card && current.price != null) pricesOf(selected, current.price) else pricesOf(selected, versions?.prices?.get(selected.cardmarketId))
-    val now = prices.best(priceType)
+    val now = com.poketrader.data.Pricing.unit(selected, prices.best(priceType))
     // The same card first (other binders, conditions, versions), then the rest by value.
     val others = rows.filter { it.item.id != item.id }.sortedWith(
         compareBy<CollectionRow> { if (it.item.card.cardId == item.card.cardId) 0 else 1 }
@@ -216,7 +216,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                         if (options.size > 1) {
                             CompactDropdown(
                                 "Version", selected, options, { it.variantLabel }, { selected = it }, Modifier.weight(1f),
-                                menuLabel = { p -> "${p.variantLabel}  ${Fmt.money(pricesOf(p, versions?.prices?.get(p.cardmarketId)).best(priceType))}" },
+                                menuLabel = { p -> "${p.variantLabel}  ${Fmt.money(com.poketrader.data.Pricing.unit(p, pricesOf(p, versions?.prices?.get(p.cardmarketId)).best(priceType)))}" },
                             )
                         } else {
                             CompactBox("Version", Modifier.weight(1f)) {
@@ -291,6 +291,11 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                             }
                         }
                     }
+
+                    // TCGplayer (since 1.16).
+                    HorizontalDivider()
+                    Text("Prices elsewhere", style = MaterialTheme.typography.titleSmall)
+                    OtherPrices(selected) { url -> runCatching { uriHandler.openUri(url) } }
 
                     // Cardmarket's numbers, folded away.
                     HorizontalDivider()

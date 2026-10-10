@@ -62,6 +62,7 @@ import com.poketrader.data.CollectionStats
 import com.poketrader.data.CollectionStatsResult
 import com.poketrader.data.Era
 import com.poketrader.data.PriceType
+import com.poketrader.data.Pricing
 import com.poketrader.data.StatCard
 import com.poketrader.data.StatEntry
 import com.poketrader.data.AppCurrency
@@ -87,7 +88,12 @@ fun StatsScreen(nav: NavController) {
     val eras by produceState(emptyMap<String, Era>()) {
         value = listOf("en", "ja").flatMap { lang -> c.sets.eras(lang).map { (id, e) -> "$lang/$id" to e } }.toMap()
     }
-    val stats by produceState<CollectionStatsResult?>(null, rows, binder, priceType, binders, eras) {
+    // The chosen price source and its prices (since 1.16) change the values too.
+    val pricing = listOf(Pricing.source, Pricing.tcgplayer, Pricing.usdPerEuro)
+    val scoped = remember(rows, binder) { rows.orEmpty().let { all -> if (binder == null) all else all.filter { it.item.binderId == binder } } }
+    val sources = remember(scoped, priceType, pricing) { sourceTotals(scoped, priceType) }
+    val gaps = remember(scoped, priceType, pricing) { priceGaps(scoped, priceType) }
+    val stats by produceState<CollectionStatsResult?>(null, rows, binder, priceType, binders, eras, pricing) {
         val all = rows ?: return@produceState
         value = withContext(Dispatchers.Default) {
             CollectionStats.compute(
@@ -123,6 +129,7 @@ fun StatsScreen(nav: NavController) {
         StatsContent(
             s, priceType, binders, binder, { binder = it }, mode, { mode = it }, erasLoaded = eras.isNotEmpty(),
             onPick = ::show, onOpen = { opened = it }, modifier = Modifier.padding(pad),
+            sources = sources, gaps = gaps,
         )
     }
 
@@ -143,6 +150,9 @@ fun StatsContent(
     onPick: (CollectionJump?) -> Unit,
     onOpen: (CollectionRow) -> Unit,
     modifier: Modifier = Modifier,
+    /** Since 1.16: the value at each price source, and the biggest Cardmarket/TCGplayer gaps. */
+    sources: List<SourceTotal> = emptyList(),
+    gaps: List<PriceGap> = emptyList(),
 ) {
     val show = onPick
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -155,6 +165,18 @@ fun StatsContent(
         }
         item(key = "overview") { Overview(s, priceType) }
         if (s.copies == 0) return@LazyColumn
+        if (sources.isNotEmpty()) {
+            item(key = "sources") {
+                Section("Value by price source", "Cardmarket is Europe's market, TCGplayer America's. TCGplayer has English prints only.") {
+                    SourceComparison(sources, Pricing.source, Pricing.usdPerEuro != null)
+                }
+            }
+            item(key = "gaps") {
+                Section("Europe or the US?", "The cards whose price differs most between Cardmarket and TCGplayer, over the copies you own.") {
+                    PriceGapList(gaps)
+                }
+            }
+        }
         item(key = "mode") {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 StatMode.entries.forEachIndexed { i, m ->
@@ -209,7 +231,7 @@ private fun Overview(s: CollectionStatsResult, priceType: PriceType) {
                 Figure("Printings", "%,d".format(s.printings), Modifier.weight(1f))
             }
             Row {
-                Figure("Value (${priceType.short})", Fmt.money(s.value), Modifier.weight(1f))
+                Figure("Value (${if (Pricing.source == com.poketrader.data.PriceSource.CARDMARKET) priceType.short else Pricing.source.label})", Fmt.money(s.value), Modifier.weight(1f))
                 Figure("Per card", Fmt.money(s.averageValue), Modifier.weight(1f))
                 Spacer(Modifier.weight(1f))
             }

@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.15.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.16.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.15-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.16-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -104,6 +104,12 @@ reverse holo" set it by hand, as before.
 - **Prices:** Cardmarket's public daily Pokémon price guide (`price_guide_6.json`, ~15 MB), downloaded once a day.
   Each card *variant* (normal, reverse holo, Poké Ball / Master Ball pattern, stamped…) has its own Cardmarket
   product id in TCGdex; reverse holos use the guide's "holo" price columns.
+- **TCGplayer** (since 1.16): TCGplayer's market prices in US dollars come with TCGdex's card data (refreshed daily for
+  the cards you have, one card at a time, and whenever TCGdex sends a card). Settings → **Price source** picks Cardmarket
+  or TCGplayer to value your cards (collection total, sorting, filters, trades). TCGplayer has one price per version, for
+  English prints: normal, holo, reverse holo and 1st edition. Stamped, special-pattern, other-print and jumbo versions
+  and Japanese prints keep Cardmarket's price, shown with "≈". The value screen (with a chart per source from 1.16 on),
+  the stats ("Value by price source", "Europe or the US?") and each card's page compare both. Kept on the phone only.
 - **Currency:** prices are in euros (Cardmarket's). Settings → **Currency** shows them in Danish kroner or US dollars
   instead, converted with the [European Central Bank's daily rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
   (downloaded twice a day at most, kept for offline use). Purchase and agreed prices you type are in that currency too;

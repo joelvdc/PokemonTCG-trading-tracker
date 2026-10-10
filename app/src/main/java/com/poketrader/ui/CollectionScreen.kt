@@ -329,7 +329,9 @@ fun CollectionScreen(nav: NavController) {
             val source = if (wish) wishRows.map { it.asCollectionRow() } else all
             source.filter { r -> wish || selected == null || r.item.binderId == selected }
         }
-        val shown = remember(inView, filter, cardFilter, sort, priceType) {
+        // Sorting and filtering by value follow the price source and its prices (since 1.16).
+        val pricing = listOf(com.poketrader.data.Pricing.source, com.poketrader.data.Pricing.tcgplayer, com.poketrader.data.Pricing.usdPerEuro)
+        val shown = remember(inView, filter, cardFilter, sort, priceType, pricing) {
             val f = filter.trim()
             inView.filter { r ->
                 (f.isEmpty() || r.item.card.name.contains(f, true) || r.item.card.setName.contains(f, true)) && cardFilter.matches(r, priceType)
@@ -586,7 +588,7 @@ private fun CollectionListRow(row: CollectionRow, price: Double?, binder: String
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(Fmt.money(price), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(approx(row) + Fmt.money(price), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 if (item.quantity > 1) {
                     Text(Fmt.money(price?.let { it * item.quantity }) + " total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -615,7 +617,7 @@ private fun CompactRow(row: CollectionRow, price: Double?, binder: String?, onCl
                 modifier = Modifier.weight(1f),
             )
             Text(
-                Fmt.money(price),
+                approx(row) + Fmt.money(price),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.End,

@@ -27,6 +27,7 @@ class DataUpdater(
     private val repo: Repository,
     private val network: NetworkMonitor,
     private val history: ValueHistory,
+    private val priceSources: PriceSourceStore,
 ) {
     private val lock = Mutex()
 
@@ -38,6 +39,8 @@ class DataUpdater(
         if (allowedNow()) lock.withLock {
             if (prices.isStale) prices.refresh()
             if (catalog.isStale && catalog.refresh()) recheckAll()
+            // TCGplayer (since 1.16).
+            runCatching { priceSources.refreshIfStale() }
         }
         recordValue()
     }
@@ -47,12 +50,14 @@ class DataUpdater(
         lock.withLock {
             prices.refresh()
             if (catalog.refresh()) recheckAll()
+            runCatching { priceSources.refresh() }
         }
         recordValue()
     }
 
     /** Saves today's collection value for the value chart. */
     private suspend fun recordValue() {
+        runCatching { priceSources.loadOwned() }
         runCatching { history.record() }
     }
 

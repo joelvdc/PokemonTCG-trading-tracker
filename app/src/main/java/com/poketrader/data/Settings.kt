@@ -40,6 +40,15 @@ class Settings(context: Context) {
     private val _priceType = MutableStateFlow(PriceType.fromKey(prefs.getString("priceType", null)))
     val priceType: StateFlow<PriceType> = _priceType
 
+    private val _priceSource = MutableStateFlow(PriceSource.fromKey(prefs.getString("priceSource", null)))
+    /** Where the price of a card comes from. Since 1.16. */
+    val priceSource: StateFlow<PriceSource> = _priceSource
+
+    fun setPriceSource(s: PriceSource) {
+        _priceSource.value = s
+        prefs.edit().putString("priceSource", s.key).apply()
+    }
+
     private val _currency = MutableStateFlow(AppCurrency.fromKey(prefs.getString("currency", null)))
     /** The currency prices are shown in. Since 1.15. */
     val currency: StateFlow<AppCurrency> = _currency

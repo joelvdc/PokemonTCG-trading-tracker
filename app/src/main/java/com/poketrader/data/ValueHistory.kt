@@ -33,37 +33,61 @@ class ValueHistory(private val db: AppDatabase) {
         dao.put(ValueSnapshot(today.toString(), rows.sumOf { it.item.quantity }, values.toString()))
     }
 
-    /** The whole collection's value per day, or one [binder]'s (days before 1.14 have no binder values). */
-    fun observe(type: PriceType, binder: Long? = null): Flow<List<ValuePoint>> = dao.observeAll().map { rows ->
+    /**
+     * The whole collection's value per day, or one [binder]'s (days before 1.14 have no binder values),
+     * at [source] (days before 1.16 only have Cardmarket's).
+     */
+    fun observe(type: PriceType, binder: Long? = null, source: PriceSource = PriceSource.CARDMARKET): Flow<List<ValuePoint>> = dao.observeAll().map { rows ->
         rows.mapNotNull { r ->
             val values = runCatching {
                 (Json.parseToJsonElement(r.values) as JsonObject).mapNotNull { (k, v) -> (v as? JsonPrimitive)?.doubleOrNull?.let { k to it } }.toMap()
             }.getOrNull() ?: return@mapNotNull null
-            point(LocalDate.parse(r.day), r.cards, values, type, binder)
+            point(LocalDate.parse(r.day), r.cards, values, sourceKey(type, source), binder)
         }
     }
 
     companion object {
         fun binderKey(binder: Long, what: String) = "b:$binder:$what"
 
+        /** "trend" for Cardmarket (as before 1.16), "trend@tcgplayer" for TCGplayer. */
+        fun sourceKey(type: PriceType, source: PriceSource) = if (source == PriceSource.CARDMARKET) type.key else "${type.key}@${source.key}"
+
+        /** The sources with prices for any of [rows] (TCGplayer needs the dollar rate too). */
+        fun sourcesWithPrices(rows: List<CollectionRow>): List<PriceSource> = PriceSource.entries.filter { s ->
+            s == PriceSource.CARDMARKET || rows.any { it.priceAt(s, PriceType.TREND) != null }
+        }
+
+        /** The value at [source], with Cardmarket's [type] price for cards it has none for. Since 1.16. */
+        fun sourceTotal(rows: List<CollectionRow>, source: PriceSource, type: PriceType) =
+            rows.sumOf { r -> (r.priceAt(source, type) ?: r.cardmarketPrice(type) ?: 0.0) * r.item.quantity }
+
+        /** Copies [source] has a price for. */
+        fun covered(rows: List<CollectionRow>, source: PriceSource) = rows.filter { it.priceAt(source, PriceType.TREND) != null }.sumOf { it.item.quantity }
+
         /** A day's numbers: the total per price type, and per binder its card count and value per price type. */
-        fun snapshotValues(rows: List<CollectionRow>, binders: List<Long>): Map<String, Double> {
+        fun snapshotValues(rows: List<CollectionRow>, binders: List<Long>, sources: List<PriceSource> = sourcesWithPrices(rows)): Map<String, Double> {
             val out = LinkedHashMap<String, Double>()
-            PriceType.entries.forEach { t -> out[t.key] = totalValue(rows, t) }
+            fun totals(rs: List<CollectionRow>, key: (String) -> String) {
+                for (s in sources) PriceType.entries.forEach { t -> out[key(sourceKey(t, s))] = sourceTotal(rs, s, t) }
+            }
+            totals(rows) { it }
             val byBinder = rows.groupBy { it.item.binderId }
             // Every binder, an empty one too, so its chart drops to zero instead of stopping.
             for (b in (binders + byBinder.keys).distinct()) {
                 val rs = byBinder[b].orEmpty()
                 out[binderKey(b, "cards")] = rs.sumOf { it.item.quantity }.toDouble()
-                PriceType.entries.forEach { t -> out[binderKey(b, t.key)] = totalValue(rs, t) }
+                totals(rs) { binderKey(b, it) }
             }
             return out
         }
 
         /** Reads one point back from a day's numbers; null when the day has none for [binder]. */
         fun point(day: LocalDate, cards: Int, values: Map<String, Double>, type: PriceType, binder: Long?): ValuePoint? =
-            if (binder == null) values[type.key]?.let { ValuePoint(day, it, cards) }
-            else values[binderKey(binder, type.key)]?.let { v -> ValuePoint(day, v, values[binderKey(binder, "cards")]?.toInt() ?: 0) }
+            point(day, cards, values, type.key, binder)
+
+        fun point(day: LocalDate, cards: Int, values: Map<String, Double>, key: String, binder: Long?): ValuePoint? =
+            if (binder == null) values[key]?.let { ValuePoint(day, it, cards) }
+            else values[binderKey(binder, key)]?.let { v -> ValuePoint(day, v, values[binderKey(binder, "cards")]?.toInt() ?: 0) }
 
         fun totalValue(rows: List<CollectionRow>, type: PriceType) = rows.sumOf { (it.unitPrice(type) ?: 0.0) * it.item.quantity }
 

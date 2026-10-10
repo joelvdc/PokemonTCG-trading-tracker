@@ -125,7 +125,7 @@ data class ScannedEntry(
     /** How many copies this line added. */
     val quantity get() = result.copies
 
-    fun unitPrice(type: PriceType): Double? = prices.best(type) ?: card.fallbackPrice
+    fun unitPrice(type: PriceType): Double? = com.poketrader.data.Pricing.unit(card, prices.best(type) ?: card.fallbackPrice)
 }
 
 /** Which version the scanner adds: the camera decides, or always normal, or always holo / reverse holo. Since 1.9. */
