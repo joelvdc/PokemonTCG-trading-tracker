@@ -124,4 +124,16 @@ class PriceSourceTest {
             db.close()
         }
     }
+
+    @Test
+    fun downloadsOnceADayAndWaitsAfterAFailure() {
+        val hour = 60 * 60 * 1000L
+        val now = 1_000 * hour
+        assertTrue(com.poketrader.data.PriceSourceStore.isDue(0, 0, now))
+        assertTrue(!com.poketrader.data.PriceSourceStore.isDue(now - 2 * hour, 0, now))
+        assertTrue(com.poketrader.data.PriceSourceStore.isDue(now - 21 * hour, 0, now))
+        // Failed an hour ago (e.g. offline): no new try on every app start, only after a few hours.
+        assertTrue(!com.poketrader.data.PriceSourceStore.isDue(0, now - hour, now))
+        assertTrue(com.poketrader.data.PriceSourceStore.isDue(0, now - 7 * hour, now))
+    }
 }

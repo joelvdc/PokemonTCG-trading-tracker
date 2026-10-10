@@ -103,6 +103,8 @@ fun AppNav() {
             if (topLevel) {
                 Column {
                     PriceStatusStrip(if (priceState == PriceUpdateState.Idle && catalogState is PriceUpdateState.Running) catalogState else priceState)
+                    val sourceState by c.priceSources.status.collectAsStateWithLifecycle()
+                    SourceStatusStrip(sourceState)
                     NavigationBar {
                         tabs.forEach { tab ->
                             NavigationBarItem(
@@ -162,6 +164,34 @@ fun AppNav() {
             ) {
                 ScannerScreen(nav, CardTarget.decode(it.arguments?.getString("target") ?: "collection"))
             }
+        }
+    }
+}
+
+/** TCGplayer's download, like [PriceStatusStrip]: progress while it runs, a note when it failed. Since 1.17. */
+@Composable
+internal fun SourceStatusStrip(state: com.poketrader.data.PriceSourceStore.Status) {
+    when {
+        state.running -> Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Text(
+                    if (state.total > 0) "Getting TCGplayer's prices… ${"%,d".format(state.done)} of ${"%,d".format(state.total)} cards" else "Getting TCGplayer's prices…",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                if (state.total > 0) {
+                    LinearProgressIndicator(progress = { state.done.toFloat() / state.total }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+            }
+        }
+        state.error != null -> Surface(color = MaterialTheme.colorScheme.errorContainer) {
+            Text(
+                "TCGplayer prices: ${state.error}. It tries again later, or retry in Settings.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            )
         }
     }
 }

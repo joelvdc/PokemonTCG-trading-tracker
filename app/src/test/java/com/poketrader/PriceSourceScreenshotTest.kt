@@ -72,4 +72,17 @@ class PriceSourceScreenshotTest {
             Pricing.tcgplayer = emptyMap()
         }
     }
+
+    /** 1.17: TCGplayer's download bar above the tabs (running, then failed). */
+    @Test fun sourceDownloadBar() {
+        compose.setContent {
+            PokeColors(false) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.poketrader.ui.SourceStatusStrip(PriceSourceStore.Status(running = true, done = 420, total = 1_150))
+                    com.poketrader.ui.SourceStatusStrip(PriceSourceStore.Status(error = "12 of 1150 cards couldn't be read"))
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/source_download_bar.png")
+    }
 }
