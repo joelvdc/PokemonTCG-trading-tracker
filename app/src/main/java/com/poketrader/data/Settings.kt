@@ -40,6 +40,15 @@ class Settings(context: Context) {
     private val _priceType = MutableStateFlow(PriceType.fromKey(prefs.getString("priceType", null)))
     val priceType: StateFlow<PriceType> = _priceType
 
+    private val _currency = MutableStateFlow(AppCurrency.fromKey(prefs.getString("currency", null)))
+    /** The currency prices are shown in. Since 1.15. */
+    val currency: StateFlow<AppCurrency> = _currency
+
+    fun setCurrency(c: AppCurrency) {
+        _currency.value = c
+        prefs.edit().putString("currency", c.name).apply()
+    }
+
     private val _tolerance = MutableStateFlow(prefs.getInt("tolerancePct", 5))
     val tolerancePct: StateFlow<Int> = _tolerance
 

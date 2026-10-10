@@ -64,6 +64,8 @@ import com.poketrader.data.Era
 import com.poketrader.data.PriceType
 import com.poketrader.data.StatCard
 import com.poketrader.data.StatEntry
+import com.poketrader.data.AppCurrency
+import com.poketrader.data.Money
 import com.poketrader.data.StatMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -190,7 +192,7 @@ fun StatsContent(
         if (s.languages.size > 1) item(key = "languages") { Section("Language") { Bars(s.languages, mode, limit = 6, onPick = show) } }
         item(key = "conditions") { Section("Condition") { Bars(s.conditions, mode, keepOrder = true, onPick = show) } }
         if (binder == null && s.binders.size > 1) item(key = "binderValue") { Section("Binders") { Bars(s.binders, mode, onPick = show) } }
-        item(key = "added") { Section("Cards added", "The last 12 months.") { Columns(s.added, mode) } }
+        item(key = "added") { Section("Cards added", "The last 12 months." + if (mode == StatMode.VALUE && Money.display.currency != AppCurrency.EUR) " Values in ${Money.symbol}" else "") { Columns(s.added, mode) } }
         item(key = "valuable") {
             Section("Most valuable", "Tap a card to open it.") { CardList(s.mostValuable, priceType, onOpen) }
         }
@@ -325,7 +327,7 @@ private fun Columns(entries: List<StatEntry>, mode: StatMode) {
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
                 if (e.copies > 0) {
                     Text(
-                        if (mode == StatMode.CARDS) "${e.copies}" else "€%.0f".format(e.value),
+                        if (mode == StatMode.CARDS) "${e.copies}" else Money.column(e.value),
                         style = MaterialTheme.typography.labelSmall, maxLines = 1,
                     )
                 }

@@ -225,5 +225,5 @@ object CollectionStats {
 
     private fun setLabel(card: CardRef) = card.setName.ifBlank { card.setId } + if (card.isJapanese) " (JP)" else ""
 
-    private fun euros(v: Double) = "€%.0f".format(v)
+    private fun euros(v: Double) = Money.format(v, decimals = 0)
 }

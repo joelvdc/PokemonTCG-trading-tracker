@@ -89,6 +89,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.poketrader.container
+import com.poketrader.data.Money
 import com.poketrader.data.Balance
 import com.poketrader.data.Binder
 import com.poketrader.data.CONDITIONS
@@ -113,36 +114,23 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.Surface
 
 object Fmt {
-    private val eur = NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
-        currency = Currency.getInstance("EUR")
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }
-
-    fun money(v: Double?): String = if (v == null) "—" else eur.format(v)
-    fun signedMoney(v: Double): String = (if (v > 0.004) "+" else if (v < -0.004) "−" else "") + eur.format(abs(v))
+    /** Amounts are in euros; they're shown in the chosen currency (see [Money], since 1.15). */
+    fun money(v: Double?): String = if (v == null) "—" else Money.format(v)
+    fun signedMoney(v: Double): String = (if (v > 0.004) "+" else if (v < -0.004) "−" else "") + Money.format(abs(v))
     fun date(ms: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
     fun dateTime(ms: Long): String = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ms))
 
     /** Parses "3,50" or "3.50"; null for blank/invalid. */
     fun parseMoney(s: String): Double? = s.trim().replace(',', '.').toDoubleOrNull()
 
-    private val eurWhole = NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
-        currency = Currency.getInstance("EUR")
-        maximumFractionDigits = 0
-    }
+    /** An amount typed in the display currency ("3,50"), in euros; null for blank/invalid. Since 1.15. */
+    fun parseMoneyEur(s: String): Double? = parseMoney(s)?.let(Money::toEur)
 
     /** "€1,005": no cents. Since 1.11. */
-    fun wholeMoney(v: Double): String = eurWhole.format(v)
+    fun wholeMoney(v: Double): String = Money.format(v, decimals = 0)
 
     /** "€10k", "€1.2M": for tight spaces; small amounts keep their cents. Since 1.11. */
-    fun shortMoney(v: Double): String {
-        if (abs(v) < 1000) return eur.format(v)
-        val (n, unit) = if (abs(v) >= 1_000_000) v / 1_000_000 to "M" else v / 1000 to "k"
-        val number = java.text.DecimalFormat("0.#", java.text.DecimalFormatSymbols.getInstance(Locale.getDefault())).format(n) + unit
-        val symbolFirst = !eur.format(1.0).first().isDigit()
-        return if (symbolFirst) "€$number" else "$number €"
-    }
+    fun shortMoney(v: Double): String = Money.short(v)
 }
 
 /**
@@ -640,8 +628,8 @@ fun CardDialog(
     val c = LocalContext.current.container
     var selected by remember { mutableStateOf(card) }
     var v by remember { mutableStateOf(initial) }
-    var paidText by remember { mutableStateOf(initial.purchasePrice?.let { "%.2f".format(it) } ?: "") }
-    var customText by remember { mutableStateOf(initial.customPrice?.let { "%.2f".format(it) } ?: "") }
+    var paidText by remember { mutableStateOf(Money.input(initial.purchasePrice)) }
+    var customText by remember { mutableStateOf(Money.input(initial.customPrice)) }
     var pickingPrinting by remember { mutableStateOf(false) }
     // The versions of the card shown: reloaded when another printing (set/number) is picked.
     val data by produceState<VariantData?>(null, selected.cardId, selected.dataLang) {
@@ -748,7 +736,7 @@ fun CardDialog(
                         value = customText,
                         onValueChange = {
                             customText = it
-                            v = v.copy(customPrice = Fmt.parseMoney(it))
+                            v = v.copy(customPrice = Fmt.parseMoneyEur(it))
                         },
                         label = { Text("Agreed price per card (optional)") },
                         singleLine = true,
@@ -762,7 +750,7 @@ fun CardDialog(
                         value = paidText,
                         onValueChange = {
                             paidText = it
-                            v = v.copy(purchasePrice = Fmt.parseMoney(it))
+                            v = v.copy(purchasePrice = Fmt.parseMoneyEur(it))
                         },
                         label = { Text("What you paid per card (optional)") },
                         singleLine = true,

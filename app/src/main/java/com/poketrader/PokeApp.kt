@@ -23,6 +23,7 @@ import com.poketrader.data.ValueHistory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -55,6 +56,7 @@ class AppContainer(context: Context) {
         .build()
     val db = AppDatabase.build(context)
     val settings = Settings(context)
+    val exchangeRates = com.poketrader.data.ExchangeRateStore(context, http)
     val tcgdex = TcgdexApi(http)
     val sets = SetCatalog(context, tcgdex)
     val fallbackImages = FallbackImageSets(context, http, sets)
@@ -72,6 +74,14 @@ class AppContainer(context: Context) {
     /** Set by the stats screen; the collection shows these cards when it next appears. Since 1.13. */
     val collectionJump = MutableStateFlow<CollectionJump?>(null)
     val updater = DataUpdater(context, settings, prices, catalog, repo, network, history)
+
+    init {
+        // Prices show in the chosen currency at the latest rate (since 1.15).
+        appScope.launch {
+            kotlinx.coroutines.flow.combine(settings.currency, exchangeRates.rates) { cur, rates -> com.poketrader.data.DisplayCurrency.of(cur, rates) }
+                .collect { com.poketrader.data.Money.display = it }
+        }
+    }
 
     /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
     @Volatile
