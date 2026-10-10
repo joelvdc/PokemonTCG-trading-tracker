@@ -57,7 +57,11 @@ data class TcgCardmarketPricing(
 )
 
 @Serializable
-data class TcgPricing(val cardmarket: TcgCardmarketPricing? = null)
+data class TcgPricing(
+    val cardmarket: TcgCardmarketPricing? = null,
+    /** TCGplayer's prices in US dollars by kind ("normal", "holofoil", "reverse-holofoil"…). Since 1.16. */
+    val tcgplayer: kotlinx.serialization.json.JsonObject? = null,
+)
 
 @Serializable
 data class TcgThirdParty(val cardmarket: Int? = null, val tcgplayer: Int? = null)
@@ -307,10 +311,13 @@ class TcgdexApi(private val http: OkHttpClient) {
     suspend fun card(id: String, lang: String): TcgCard? =
         cardAsIs(id, lang)?.let { repaired(it, lang) } ?: missing(id.substringBeforeLast('-'), id.substringAfterLast('-'), lang)
 
+    /** Gets every card TCGdex sends, with its TCGplayer prices (see [PriceSourceStore.fromTcgdex]). Since 1.16. */
+    var onCard: (suspend (TcgCard, String) -> Unit)? = null
+
     /** A card exactly as TCGdex has it, without Cardmarket corrections. */
     suspend fun cardAsIs(id: String, lang: String): TcgCard? {
         val body = call(url(lang, "cards/$id")) ?: return null
-        return json.decodeFromString<TcgCard>(body)
+        return json.decodeFromString<TcgCard>(body).also { c -> runCatching { onCard?.invoke(c, lang) } }
     }
 
     /** A card by set and printed number; tries "25", then "025" style padding. */

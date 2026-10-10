@@ -551,6 +551,8 @@ suspend fun SnackbarHostState.showUndo(message: String): Boolean {
 /** Price going up (green ▲), down (red ▼) or unchanged (▬), with the percentage; nothing without data. */
 @Composable
 fun TrendBadge(trend: PriceTrend?, modifier: Modifier = Modifier, style: TextStyle = MaterialTheme.typography.labelMedium) {
+    // Cardmarket's arrows only make sense next to Cardmarket's prices (since 1.16).
+    if (com.poketrader.data.Pricing.source != com.poketrader.data.PriceSource.CARDMARKET) return
     if (trend == null) return
     val color = when {
         trend.flat -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -658,7 +660,7 @@ fun CardDialog(
                         }
                         val selectedPrices = pricesOf(selected, data?.prices?.get(selected.cardmarketId))
                         Text(
-                            Fmt.money(selectedPrices.best(priceType)),
+                            Fmt.money(com.poketrader.data.Pricing.unit(selected, selectedPrices.best(priceType))),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                         )
@@ -692,7 +694,7 @@ fun CardDialog(
                                 onClick = { selected = p },
                                 enabled = enabled,
                                 label = {
-                                    Text("${p.variantLabel}  ${Fmt.money(pricesOf(p, d.prices[p.cardmarketId]).best(priceType))}")
+                                    Text("${p.variantLabel}  ${Fmt.money(com.poketrader.data.Pricing.unit(p, pricesOf(p, d.prices[p.cardmarketId]).best(priceType)))}")
                                 },
                             )
                         }

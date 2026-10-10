@@ -238,9 +238,9 @@ interface ScanDao {
 @Database(
     entities = [
         PriceEntity::class, CollectionItem::class, Trade::class, TradeItem::class, Binder::class, ScannedCard::class,
-        CmProduct::class, CmSetExpansion::class, WishlistItem::class, ValueSnapshot::class,
+        CmProduct::class, CmSetExpansion::class, WishlistItem::class, ValueSnapshot::class, SourcePrice::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -252,12 +252,23 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao
     abstract fun wishlistDao(): WishlistDao
     abstract fun valueHistoryDao(): ValueHistoryDao
+    abstract fun sourcePriceDao(): SourcePriceDao
 
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "poketrader.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
+
+        /** Version 5 (app 1.16): TCGplayer's prices, kept on the phone. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `source_prices` (`cardKey` TEXT NOT NULL, `source` TEXT NOT NULL, `price` REAL, " +
+                        "`url` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`cardKey`, `source`))"
+                )
+            }
+        }
 
         /** Version 4 (app 1.9): wishlist, value history, notes and purchase price. */
         val MIGRATION_3_4 = object : Migration(3, 4) {

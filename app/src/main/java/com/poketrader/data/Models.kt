@@ -198,10 +198,12 @@ data class ScanRow(
     @Embedded val item: ScannedCard,
     @Embedded(prefix = "pr_") val price: PriceEntity?,
 ) {
+    /** From the price source chosen in Settings (since 1.16). */
     fun unitPrice(type: PriceType): Double? =
-        price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice
+        Pricing.unit(item.card, price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice)
 
-    val trend: PriceTrend? get() = price?.toSet(item.card.holoPrice)?.trendChange
+    /** Cardmarket's trend arrow; none while another price source is chosen (since 1.16). */
+    val trend: PriceTrend? get() = if (Pricing.source == PriceSource.CARDMARKET) price?.toSet(item.card.holoPrice)?.trendChange else null
 }
 
 /** Collection row joined with today's price guide entry. */
@@ -209,10 +211,20 @@ data class CollectionRow(
     @Embedded val item: CollectionItem,
     @Embedded(prefix = "pr_") val price: PriceEntity?,
 ) {
-    fun unitPrice(type: PriceType): Double? =
-        price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice
+    /** Cardmarket's price of one copy in [type]. */
+    fun cardmarketPrice(type: PriceType): Double? = price?.toSet(item.card.holoPrice)?.best(type) ?: item.card.fallbackPrice
 
-    val trend: PriceTrend? get() = price?.toSet(item.card.holoPrice)?.trendChange
+    /** One copy's price from the source chosen in Settings, else Cardmarket's. Since 1.16. */
+    fun unitPrice(type: PriceType): Double? = Pricing.unit(item.card, cardmarketPrice(type))
+
+    /** One copy's price at [source]; null when it has none. Since 1.16. */
+    fun priceAt(source: PriceSource, type: PriceType): Double? = Pricing.at(source, item.card, cardmarketPrice(type))
+
+    /** [unitPrice] is Cardmarket's, standing in for the chosen source. */
+    val isApprox: Boolean get() = Pricing.isApprox(item.card)
+
+    /** Cardmarket's trend arrow; none while another price source is chosen (since 1.16). */
+    val trend: PriceTrend? get() = if (Pricing.source == PriceSource.CARDMARKET) price?.toSet(item.card.holoPrice)?.trendChange else null
 }
 
 @Entity(tableName = "trades")
@@ -258,7 +270,7 @@ data class TradeItem(
     /** For given cards: the binder they were (mostly) taken from, so undoing puts them back there. Since 1.5. */
     @ColumnInfo(defaultValue = "0") val appliedBinderId: Long = Binder.UNSORTED,
 ) {
-    fun unitPrice(type: PriceType): Double? = customPrice ?: prices.best(type) ?: card.fallbackPrice
+    fun unitPrice(type: PriceType): Double? = customPrice ?: Pricing.unit(card, prices.best(type) ?: card.fallbackPrice)
     fun lineTotal(type: PriceType): Double = (unitPrice(type) ?: 0.0) * quantity
 }
 

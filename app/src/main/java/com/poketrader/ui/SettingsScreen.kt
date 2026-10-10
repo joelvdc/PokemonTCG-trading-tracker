@@ -31,6 +31,7 @@ import com.poketrader.BuildConfig
 import com.poketrader.container
 import com.poketrader.data.AppCurrency
 import com.poketrader.data.ExchangeRates
+import com.poketrader.data.PriceSource
 import com.poketrader.data.PriceType
 import com.poketrader.data.PriceUpdateState
 import kotlinx.coroutines.launch
@@ -62,6 +63,8 @@ fun SettingsScreen() {
     val autoUpdate by c.settings.autoUpdate.collectAsStateWithLifecycle()
     val wifiOnly by c.settings.wifiOnly.collectAsStateWithLifecycle()
     val themeMode by c.settings.themeMode.collectAsStateWithLifecycle()
+    val priceSource by c.settings.priceSource.collectAsStateWithLifecycle()
+    val sourceStatus by c.priceSources.status.collectAsStateWithLifecycle()
     val currency by c.settings.currency.collectAsStateWithLifecycle()
     val rates by c.exchangeRates.rates.collectAsStateWithLifecycle()
 
@@ -70,7 +73,17 @@ fun SettingsScreen() {
         topBar = { TopAppBar(title = { Text("Settings") }) },
     ) { pad ->
         Column(Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(16.dp)) {
-            Text("Price used for valuing cards", style = MaterialTheme.typography.titleMedium)
+            PriceSourceSection(priceSource, sourceStatus, c.settings::setPriceSource)
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            Text(if (priceSource == PriceSource.CARDMARKET) "Price used for valuing cards" else "Cardmarket price", style = MaterialTheme.typography.titleMedium)
+            if (priceSource != PriceSource.CARDMARKET) {
+                Text(
+                    "Used for cards TCGplayer has no price for (shown with ≈), and in the comparisons.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             PriceType.entries.forEach { t ->
                 Row(
                     Modifier.fillMaxWidth().clickable { c.settings.setPriceType(t) }.padding(vertical = 4.dp),
@@ -229,4 +242,40 @@ internal fun rateLine(currency: AppCurrency, rates: ExchangeRates?): String {
         currency == AppCurrency.DKK -> "1 € ≈ 7.46 DKK (the krone's fixed rate) until the first download of the daily rates."
         else -> "Waiting for the daily exchange rates: prices show in euros until then."
     }
+}
+
+/** Settings → Price source: where a card's price comes from. Since 1.16. */
+@Composable
+internal fun PriceSourceSection(source: PriceSource, status: com.poketrader.data.PriceSourceStore.Status, onPick: (PriceSource) -> Unit) {
+    Text("Price source", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Where card prices come from: the collection total, sorting, filters and trades use it. The value screen, the stats and each " +
+            "card's page compare both. TCGplayer's dollar prices are converted with the daily exchange rates.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val help = mapOf(
+        PriceSource.CARDMARKET to "Europe's market, in euros. Has price types and trend arrows.",
+        PriceSource.TCGPLAYER to "America's largest market: its market price per version (any condition). English prints only; " +
+            "special versions (stamps, patterns, jumbo) use Cardmarket's.",
+    )
+    PriceSource.entries.forEach { s ->
+        Row(Modifier.fillMaxWidth().clickable { onPick(s) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = s == source, onClick = { onPick(s) })
+            Column {
+                Text(s.label)
+                Text(help[s].orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+    Text(
+        when {
+            status.running -> "Getting TCGplayer's prices… ${status.done} of ${status.total} cards"
+            status.tcgplayerAt == 0L -> "TCGplayer's prices download with the next price update (one card at a time, about a minute per 1,000 cards)."
+            else -> "TCGplayer's prices last downloaded ${Fmt.dateTime(status.tcgplayerAt)}"
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (status.running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    status.error?.let { Text("Last update: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
 }

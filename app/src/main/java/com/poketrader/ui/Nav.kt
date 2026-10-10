@@ -76,7 +76,12 @@ fun AppNav() {
             c.updater.autoUpdate()
             c.updater.repairAfterUpgrade()
         }
-        c.appScope.launch { c.exchangeRates.load() }
+        c.appScope.launch {
+            c.exchangeRates.load()
+            c.exchangeRates.rates.value?.perEuro?.get("USD")?.let { com.poketrader.data.Pricing.usdPerEuro = it }
+            // With the dollar rate known, today's value includes TCGplayer's (since 1.16).
+            runCatching { c.priceSources.loadOwned(); c.history.record() }
+        }
         // Warm up the set lists the scanner needs.
         c.appScope.launch { runCatching { c.sets.sets("en"); c.sets.sets("ja") } }
         // Pictures for international cards TCGdex has none for.

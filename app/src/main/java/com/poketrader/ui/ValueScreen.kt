@@ -54,6 +54,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.poketrader.data.PriceMove
+import com.poketrader.data.PriceSource
+import com.poketrader.data.Pricing
 import com.poketrader.data.ValueHistory
 import com.poketrader.data.ValuePoint
 import java.time.LocalDate
@@ -71,11 +73,16 @@ fun ValueScreen(nav: NavController) {
     val binders = rememberBinders()
     // null is the whole collection; since 1.14 one binder can be shown.
     var binder by rememberSaveable { mutableStateOf<Long?>(null) }
-    val history by remember(priceType, binder) { c.history.observe(priceType, binder) }.collectAsStateWithLifecycle(emptyList())
+    // The chart and total follow the price source chosen in Settings, or the one tapped in the comparison (since 1.16).
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
+    val source = picked?.let(PriceSource::fromKey) ?: Pricing.source
+    val pricing = listOf(Pricing.source, Pricing.tcgplayer, Pricing.usdPerEuro)
+    val history by remember(priceType, binder, source) { c.history.observe(priceType, binder, source) }.collectAsStateWithLifecycle(emptyList())
     val allRows by remember { c.db.collectionDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
     val rows = remember(allRows, binder) { if (binder == null) allRows else allRows.filter { it.item.binderId == binder } }
     var range by rememberSaveable { mutableStateOf(ValueRange.QUARTER) }
-    val now = remember(rows, priceType) { ValueHistory.totalValue(rows, priceType) }
+    val now = remember(rows, priceType, source, pricing) { ValueHistory.sourceTotal(rows, source, priceType) }
+    val totals = remember(rows, priceType, pricing) { sourceTotals(rows, priceType) }
     val points = remember(history, range) {
         val from = range.days?.let { LocalDate.now().minusDays(it) }
         history.filter { from == null || !it.day.isBefore(from) }
@@ -110,7 +117,9 @@ fun ValueScreen(nav: NavController) {
                 Column {
                     Text(Fmt.money(now), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "${rows.sumOf { it.item.quantity }} cards · ${priceType.label} (change it in Settings)",
+                        "${rows.sumOf { it.item.quantity }} cards · " +
+                            (if (source == PriceSource.CARDMARKET) "Cardmarket, ${priceType.label.lowercase()}" else source.label) +
+                            if (picked == null) " (change it in Settings)" else "",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -125,6 +134,17 @@ fun ValueScreen(nav: NavController) {
                     }
                 }
             }
+            item(key = "sources") {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Compare price sources", style = MaterialTheme.typography.titleMedium)
+                        Text("Tap one to see its total and chart.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        SourceComparison(totals, Pricing.source, Pricing.usdPerEuro != null, selected = source) { s ->
+                            picked = if (s == Pricing.source) null else s.key
+                        }
+                    }
+                }
+            }
             item(key = "ranges") {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ValueRange.entries.forEach { r -> FilterChip(selected = r == range, onClick = { range = r }, label = { Text(r.label) }) }
@@ -133,7 +153,8 @@ fun ValueScreen(nav: NavController) {
             item(key = "chart") {
                 if (points.size < 2) {
                     Text(
-                        (if (binder == null) "The app saves your collection's value once a day (when it opens and after each price update), "
+                        (if (source != PriceSource.CARDMARKET) "The app saves the value at ${source.label} once a day since version 1.16, "
+                        else if (binder == null) "The app saves your collection's value once a day (when it opens and after each price update), "
                         else "The app saves each binder's value once a day since version 1.14, ") +
                             "so the chart fills in as the days go by." + if (history.size == 1) " First value saved ${shortDate(history.first().day)}." else "",
                         style = MaterialTheme.typography.bodyMedium,
