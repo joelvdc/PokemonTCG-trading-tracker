@@ -70,6 +70,7 @@ import com.poketrader.data.ImageKey
 import com.poketrader.data.CollectionRow
 import com.poketrader.data.LANGUAGES
 import com.poketrader.data.LimitlessCards
+import com.poketrader.data.Money
 import com.poketrader.data.PriceEntity
 import com.poketrader.data.PriceType
 import kotlinx.coroutines.CoroutineScope
@@ -98,7 +99,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
     fun initialFor(r: CollectionRow) = r.item.let { EditValues(it.quantity, it.condition, it.language, null, it.binderId, it.quantity, it.notes, it.purchasePrice) }
     var v by remember(item.id) { mutableStateOf(initialFor(current)) }
     var selected by remember(item.id) { mutableStateOf(item.card) }
-    var paidText by remember(item.id) { mutableStateOf(item.purchasePrice?.let { "%.2f".format(it) } ?: "") }
+    var paidText by remember(item.id) { mutableStateOf(Money.input(item.purchasePrice)) }
     var pricesOpen by remember { mutableStateOf(false) }
     var pickingPrinting by remember { mutableStateOf(false) }
     var switchTo by remember { mutableStateOf<CollectionRow?>(null) }
@@ -249,9 +250,9 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                         CompactTextField(
                             "Paid per card", paidText, {
                                 paidText = it
-                                v = v.copy(purchasePrice = Fmt.parseMoney(it))
+                                v = v.copy(purchasePrice = Fmt.parseMoneyEur(it))
                             },
-                            Modifier.weight(0.38f), placeholder = "€", keyboardType = KeyboardType.Decimal,
+                            Modifier.weight(0.38f), placeholder = Money.symbol, keyboardType = KeyboardType.Decimal,
                         )
                         CompactTextField("Notes", v.notes ?: "", { v = v.copy(notes = it.ifBlank { null }) }, Modifier.weight(0.62f), placeholder = "Where from, condition…", singleLine = false)
                     }

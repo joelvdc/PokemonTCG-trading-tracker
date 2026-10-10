@@ -76,6 +76,7 @@ fun AppNav() {
             c.updater.autoUpdate()
             c.updater.repairAfterUpgrade()
         }
+        c.appScope.launch { c.exchangeRates.load() }
         // Warm up the set lists the scanner needs.
         c.appScope.launch { runCatching { c.sets.sets("en"); c.sets.sets("ja") } }
         // Pictures for international cards TCGdex has none for.

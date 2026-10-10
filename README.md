@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.14.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.15.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.14-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.15-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -104,6 +104,10 @@ reverse holo" set it by hand, as before.
 - **Prices:** Cardmarket's public daily Pokémon price guide (`price_guide_6.json`, ~15 MB), downloaded once a day.
   Each card *variant* (normal, reverse holo, Poké Ball / Master Ball pattern, stamped…) has its own Cardmarket
   product id in TCGdex; reverse holos use the guide's "holo" price columns.
+- **Currency:** prices are in euros (Cardmarket's). Settings → **Currency** shows them in Danish kroner or US dollars
+  instead, converted with the [European Central Bank's daily rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
+  (downloaded twice a day at most, kept for offline use). Purchase and agreed prices you type are in that currency too;
+  the app keeps them in euros, which is also what CSV files get. The value-over-time chart is converted at today's rate.
 - **Checking TCGdex's Cardmarket links:** Cardmarket's public list of Pokémon singles (`products_singles_6.json`,
   ~14 MB, weekly) names every product with its attacks, e.g. "Erika's Bellsprout [Careless Tackle]". The app uses it
   to fill in cards TCGdex doesn't link, and to replace links that point to another card (Gym Heroes' "Erika's …"

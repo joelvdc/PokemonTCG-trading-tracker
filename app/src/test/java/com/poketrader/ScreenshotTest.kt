@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.poketrader.data.AppCurrency
 import com.poketrader.data.Binder
+import com.poketrader.data.DisplayCurrency
+import com.poketrader.data.Money
 import com.poketrader.data.CardRef
 import com.poketrader.data.CollectionItem
 import com.poketrader.data.CollectionRow
@@ -99,4 +102,14 @@ class ScreenshotTest {
     @Test fun statsByCards() = shootStats(dark = false, mode = StatMode.CARDS, file = "stats_cards_light")
 
     @Test fun statsByValueDark() = shootStats(dark = true, mode = StatMode.VALUE, file = "stats_value_dark")
+
+    // 1.15: the same stats in Danish kroner.
+    @Test fun statsByValueInKroner() {
+        Money.display = DisplayCurrency(AppCurrency.DKK, 7.4612)
+        try {
+            shootStats(dark = false, mode = StatMode.VALUE, file = "stats_value_dkk")
+        } finally {
+            Money.display = DisplayCurrency()
+        }
+    }
 }
