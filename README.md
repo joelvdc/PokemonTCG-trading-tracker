@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.17.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.18.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.17-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.18-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders

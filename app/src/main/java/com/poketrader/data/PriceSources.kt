@@ -152,12 +152,15 @@ class PriceSourceStore(context: Context, private val db: AppDatabase, private va
         Pricing.tcgplayer = Pricing.tcgplayer + rows.associateBy { it.cardKey }
     }
 
-    suspend fun refreshIfStale() {
-        if (isStale) refresh()
-    }
+    /**
+     * The daily update. Whether it is due is decided once the lock is free, so an update that was waiting
+     * behind another one sees the fresh prices and does nothing (since 1.18; before, it asked first).
+     */
+    suspend fun refreshIfStale(): Boolean = refresh(onlyIfDue = true)
 
     /** Fetches every card you have (English prints) again from TCGdex, for its TCGplayer prices. */
-    suspend fun refresh(): Boolean = lock.withLock {
+    suspend fun refresh(onlyIfDue: Boolean = false): Boolean = lock.withLock {
+        if (onlyIfDue && !isStale) return@withLock true
         val ids = ownedCards().filter { !it.isJapanese }.map { it.cardId }.distinct()
         _status.value = _status.value.copy(running = true, done = 0, total = ids.size, error = null)
         val start = System.currentTimeMillis()

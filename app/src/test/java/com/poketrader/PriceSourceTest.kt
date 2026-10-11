@@ -15,6 +15,7 @@ import com.poketrader.data.ValueHistory
 import com.poketrader.data.tcgplayerPrices
 import com.poketrader.ui.priceGaps
 import com.poketrader.ui.sourceTotals
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -135,5 +136,63 @@ class PriceSourceTest {
         // Failed an hour ago (e.g. offline): no new try on every app start, only after a few hours.
         assertTrue(!com.poketrader.data.PriceSourceStore.isDue(0, now - hour, now))
         assertTrue(com.poketrader.data.PriceSourceStore.isDue(0, now - 7 * hour, now))
+    }
+
+    /** A tiny local web server that counts requests and answers each with [body] after [delayMs]. */
+    private class FakeServer(private val body: ByteArray, private val delayMs: Long = 200) {
+        val requests = java.util.concurrent.atomic.AtomicInteger()
+        private val server = java.net.ServerSocket(0)
+        val url get() = "http://127.0.0.1:${server.localPort}/v2/"
+
+        init {
+            Thread {
+                while (!server.isClosed) {
+                    val s = try { server.accept() } catch (e: java.io.IOException) { break }
+                    Thread {
+                        s.use {
+                            val reader = it.getInputStream().bufferedReader()
+                            while (true) if ((reader.readLine() ?: break).isEmpty()) break
+                            requests.incrementAndGet()
+                            Thread.sleep(delayMs)
+                            val out = it.getOutputStream()
+                            out.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                            out.write(body)
+                            out.flush()
+                        }
+                    }.start()
+                }
+            }.start()
+        }
+
+        fun close() = server.close()
+    }
+
+    @Test
+    fun twoUpdatesStartedTogetherDownloadOnlyOnce() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        context.getSharedPreferences("price_sources", 0).edit().clear().commit()
+        val server = FakeServer(javaClass.getResourceAsStream("/tcgdex/sv01-001.json")!!.readBytes())
+        try {
+            // One English card in the collection, so there is one card to fetch.
+            val card = card("sv01-001").printings("en").first()
+            db.collectionDao().insert(CollectionItem(card = card, quantity = 1))
+            val tcgdex = com.poketrader.data.TcgdexApi(okhttp3.OkHttpClient(), server.url)
+            val store = com.poketrader.data.PriceSourceStore(context, db, tcgdex)
+            tcgdex.onCard = { c, lang -> store.fromTcgdex(c, lang) }
+            // The app start, the "back online" check and a background worker, all at once.
+            kotlinx.coroutines.coroutineScope {
+                repeat(3) { launch(kotlinx.coroutines.Dispatchers.Default) { store.refreshIfStale() } }
+            }
+            assertEquals("the card is fetched once", 1, server.requests.get())
+            // Later the same day: nothing is due; "Update prices now" fetches again.
+            store.refreshIfStale()
+            assertEquals(1, server.requests.get())
+            store.refresh()
+            assertEquals(2, server.requests.get())
+        } finally {
+            server.close()
+            db.close()
+        }
     }
 }
