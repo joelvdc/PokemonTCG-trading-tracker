@@ -243,11 +243,11 @@ private data class TcgSetCards(val id: String = "", val cards: List<TcgBrief> = 
  * Minimal TCGdex REST client (api.tcgdex.net). [lang] is TCGdex's language code:
  * "en", "fr", "de", "it", "es", "pt" or "ja".
  */
-class TcgdexApi(private val http: OkHttpClient) {
+class TcgdexApi(private val http: OkHttpClient, baseUrl: String = "https://api.tcgdex.net/v2/") {
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; explicitNulls = false }
     private val throttle = Mutex()
     private var lastCall = 0L
-    private val base = "https://api.tcgdex.net/v2/".toHttpUrl()
+    private val base = baseUrl.toHttpUrl()
 
     private suspend fun waitTurn() = throttle.withLock {
         val wait = lastCall + 60 - SystemClock.elapsedRealtime()
