@@ -66,7 +66,7 @@ class PriceSourceScreenshotTest {
                     }
                 }
             }
-            compose.onRoot().captureRoboImage("src/test/screenshots/price_sources.png")
+            compose.onRoot().captureRoboImage("src/test/screenshots/price_sources.png", roborazziOptions = screenshotOptions)
         } finally {
             Pricing.usdPerEuro = null
             Pricing.tcgplayer = emptyMap()
@@ -83,6 +83,6 @@ class PriceSourceScreenshotTest {
                 }
             }
         }
-        compose.onRoot().captureRoboImage("src/test/screenshots/source_download_bar.png")
+        compose.onRoot().captureRoboImage("src/test/screenshots/source_download_bar.png", roborazziOptions = screenshotOptions)
     }
 }

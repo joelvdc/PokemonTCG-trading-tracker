@@ -76,6 +76,11 @@ android {
             all { test ->
                 // Robolectric downloads its Android jars from Maven Central; a mirror can be given instead.
                 System.getenv("ROBOLECTRIC_REPO")?.let { test.systemProperty("robolectric.dependency.repo.url", it) }
+                // Screens show dates and times: the reference screenshots were recorded in UTC with English
+                // formats (GitHub's machines), so the tests run that way on every computer.
+                test.systemProperty("user.timezone", "UTC")
+                test.systemProperty("user.language", "en")
+                test.systemProperty("user.country", "US")
             }
         }
     }

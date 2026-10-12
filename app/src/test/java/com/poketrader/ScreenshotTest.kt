@@ -96,7 +96,7 @@ class ScreenshotTest {
                 }
             }
         }
-        compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
+        compose.onRoot().captureRoboImage("src/test/screenshots/$file.png", roborazziOptions = screenshotOptions)
     }
 
     @Test fun statsByCards() = shootStats(dark = false, mode = StatMode.CARDS, file = "stats_cards_light")
