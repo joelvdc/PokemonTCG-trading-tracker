@@ -26,6 +26,17 @@ The owner (joelvdc) is new to GitHub: explain things in plain language, step by 
 4. When something fails (tests, build, release), fix it if it's within the plan; otherwise stop and explain what
    happened and what is needed.
 
+## Two ways to release
+- **Cloud sessions** (no keystore, can't sign): the pull request and Release workflow route described above.
+- **Sessions on the owner's PC** (local keystore): faster by hand. Pull `main` first; commit straight to `main`; run
+  `./gradlew testDebugUnitTest assembleRelease`; check the APK's certificate against the previous release
+  (`apksigner verify --print-certs`); then publish with `gh release create v<version>` and the two APKs, using
+  `release-notes/<version>.md` as the notes. The Release workflow only starts by hand, so it won't build a second copy.
+  The screenshot comparison (`verifyRoborazziDebug`) is recorded on GitHub's Linux machines and reports differences
+  on the owner's Windows PC that aren't real (times shown in another time zone); don't re-record the pictures there.
+- Either way: plan first and wait for the green light, write `release-notes/<version>.md`, keep the README current,
+  and never reuse a released version number.
+
 ## Releases
 - Releases are published on GitHub (Obtainium installs them on the owner's phones), as `PokeTrader-<version>.apk`
   (64-bit ARM) and `PokeTrader-<version>-universal.apk`.

@@ -1,8 +1,7 @@
-# Builds, signs and publishes a release. Three ways to start it:
-#   - "Run workflow" (Actions tab → Release, on main): releases versionName from app/build.gradle.kts as tag
-#     v<version>, with release-notes/<version>.md as the notes.
-#   - Creating a release on GitHub's website with a new tag v<version>: the APKs are added to that release.
-#   - Pushing a tag v<version>: as above, with the tag's message (or release-notes/<version>.md) as the notes.
+# Builds, signs and publishes a release. Start it by hand: "Run workflow" (Actions tab → Release, on main).
+# It releases versionName from app/build.gradle.kts as tag v<version>, with release-notes/<version>.md as
+# the notes. It does not start by itself on a new tag (since October 2026):
+# releases made on the owner's PC upload their own APKs, and a second build here would overwrite them.
 # Needs four repository secrets (Settings → Secrets and variables → Actions):
 #   KEYSTORE_BASE64    the release keystore file, base64-encoded
 #   KEYSTORE_PASSWORD  its store password
@@ -12,8 +11,6 @@ name: Release
 
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: write
