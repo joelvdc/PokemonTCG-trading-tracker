@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The parser on what ML Kit actually read off photos of real cards (see ScanPipelineTest.photosProbe). */
+/** The parser on what ML Kit actually read off photos of real cards. */
 class ScanParserTest {
     private val guide = Box(0f, 0f, 1000f, 1400f)
 

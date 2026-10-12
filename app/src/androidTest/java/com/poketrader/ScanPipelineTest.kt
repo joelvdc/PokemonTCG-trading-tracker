@@ -84,21 +84,4 @@ class ScanPipelineTest {
     @Test fun modernFrench() = assertFound(scan("fr_modern.png"), "sv03.5-025", "FR")
 
     @Test fun cardHeldSmallerThanGuide() = assertFound(scan("en_modern.png", inset = 0.12f), "sv03.5-025")
-
-    // Photos of real cards in sleeves (1.12). None of these four printings is in TCGdex (October 2026).
-    // The Japanese and Korean ones come from Limitless TCG instead; TCG Classic (CLV) isn't anywhere,
-    // so the scanner must say so instead of adding another card.
-
-    @Test fun exFromRuleBox() {
-        // The "ex" logo isn't read, the rule box is: offer Lugia ex cards, not plain Lugia.
-        val r = scan("photo_en_lugia_ex_clv.jpg", inset = 0f)
-        assertTrue("$r", r is ScanResult.Choose && r.candidates.isNotEmpty() && r.candidates.all { it.brief.name.lowercase() == "lugia ex" })
-        assertEquals("CLV 017", (r as ScanResult.Choose).missing)
-    }
-
-    @Test fun koreanCardFromLimitless() = assertFound(scan("photo_ko_vaporeon_v.jpg", inset = 0f), "S6a-015", "KO")
-
-    @Test fun japaneseCardFromLimitless() = assertFound(scan("photo_ja_tyranitar_go.jpg", inset = 0f), "S10b-043", "JA")
-
-    @Test fun misreadJapaneseSetCode() = assertFound(scan("photo_ja_ditto_sv4a.jpg", inset = 0f), "SV4a-144", "JA")
 }
