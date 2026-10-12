@@ -21,11 +21,15 @@ its 30-day average (`ValueHistory.biggestMoves`), and rank by the change in mone
 already shows that change per card as a percentage arrow. The collection's sort dialog (`SortField` in
 `data/CollectionQuery.kt`) has no such order yet.
 
-Open questions:
-- Two new sort orders (change in % and change in money), or one?
-- Change in money per card, or over all copies of the card (as the value screen ranks)?
-- Cards without a 30-day average have no change: put them last in both directions?
-- The change only exists for Cardmarket prices: what should the order do while another price source is chosen?
+Decided with the owner (2026-10-12):
+- **Two new sort orders:** "Change in %" and "Change in money", each with the biggest risers or the biggest fallers
+  first.
+- **The change is per card**, not over all copies owned.
+- **The value screen changes too:** "Rising lately" and "Falling lately" should show and rank the change per card
+  (today they use the change over all copies), so both screens agree.
+- **Cards without a 30-day average** have no change: always last, in both directions.
+- **While TCGplayer or Card Kingdom is the price source:** still sort by Cardmarket's change, and say so in the sort
+  dialog.
 
 ## Done
 
