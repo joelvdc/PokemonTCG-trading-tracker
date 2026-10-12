@@ -2,6 +2,11 @@
 
 The owner (joelvdc) is new to GitHub: explain things in plain language, step by step when they have to do something.
 
+## The to-do list
+`TODO.md` holds ideas the owner is collecting. When the owner mentions an idea "for the list", add it there (with the
+date, their wording and any open questions) and change no code. Nothing on the list is built until the owner gives
+the green light for the list; then plan all of it together, as below.
+
 ## How changes are made
 1. **Plan first.** When the owner asks for changes or improvements, draft a plan (what changes, why, which screens or
    files) and do **not** change code yet.
