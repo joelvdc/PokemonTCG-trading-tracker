@@ -15,7 +15,19 @@ import java.io.File
 
 /** A set as listed by pokemontcg.io (github.com/PokemonTCG/pokemon-tcg-data). */
 @Serializable
-data class PtcgSet(val id: String, val name: String = "", val printedTotal: Int? = null, val total: Int? = null)
+data class PtcgSet(
+    val id: String,
+    val name: String = "",
+    val printedTotal: Int? = null,
+    val total: Int? = null,
+    val images: PtcgSetImages? = null,
+) {
+    /** Sets from 2026 on have their pictures on images.scrydex.com; the old server has none for them. Since 1.19. */
+    val onScrydex get() = images?.symbol?.startsWith(FallbackImages.SCRYDEX) == true
+}
+
+@Serializable
+data class PtcgSetImages(val symbol: String? = null)
 
 /**
  * TCGdex has no picture for some international cards (promos, special collections…). pokemontcg.io
@@ -25,16 +37,26 @@ data class PtcgSet(val id: String, val name: String = "", val printedTotal: Int?
 object FallbackImages {
     const val CDN = "https://images.pokemontcg.io"
 
+    /** pokemontcg.io's newer picture server: "<SCRYDEX>/pokemon/me3-1/small". Since 1.19. */
+    const val SCRYDEX = "https://images.scrydex.com"
+
+    /** pokemontcg.io set ids whose pictures are on [SCRYDEX]; set before [setIds]. */
+    @Volatile
+    var scrydexSets: Set<String> = emptySet()
+
     /** TCGdex set id → pokemontcg.io set id. Compose state, so pictures appear as soon as it's loaded. */
     var setIds by mutableStateOf<Map<String, String>>(emptyMap())
 
     /** Image base URL for a card: TCGdex's when it has one, else pokemontcg.io's (international cards only). */
     fun base(tcgdexBase: String?, dataLang: String, setId: String, localId: String): String? =
-        tcgdexBase ?: if (dataLang != "en") null else setIds[setId]?.let { "$CDN/$it/${ptcgNumber(localId)}" }
+        tcgdexBase ?: if (dataLang != "en") null else setIds[setId]?.let {
+            if (it in scrydexSets) "$SCRYDEX/pokemon/$it-${ptcgNumber(localId)}" else "$CDN/$it/${ptcgNumber(localId)}"
+        }
 
     fun thumb(base: String?): String? = base?.let {
         when {
             it.startsWith(CDN) -> "$it.png"
+            it.startsWith(SCRYDEX) -> "$it/small"
             it.startsWith(LimitlessCards.IMAGE_CDN) -> "${it}_SM.png"
             else -> "$it/low.webp"
         }
@@ -43,6 +65,7 @@ object FallbackImages {
     fun large(base: String?): String? = base?.let {
         when {
             it.startsWith(CDN) -> "${it}_hires.png"
+            it.startsWith(SCRYDEX) -> "$it/large"
             it.startsWith(LimitlessCards.IMAGE_CDN) -> "${it}_LG.png"
             else -> "$it/high.webp"
         }
@@ -63,10 +86,22 @@ object FallbackImages {
         return v
     }
 
+    private fun words(name: String) = name.lowercase().replace('é', 'e').split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
+
+    /** Every word of the shorter name is in the longer one, in the same order. */
+    private fun wordsWithin(a: List<String>, b: List<String>): Boolean {
+        val (short, long) = if (a.size <= b.size) a to b else b to a
+        if (short.isEmpty()) return false
+        var i = 0
+        for (w in long) if (i < short.size && w == short[i]) i++
+        return i == short.size
+    }
+
     /**
      * Matches sets by name, then by set code (checked against the printed card count, unless the code
      * is identical), then by a name that ends with the other (e.g. "Unleashed" ↔ "HS—Unleashed") with
-     * the same card count.
+     * the same card count, then by a name whose words are all in the other, in order ("30th Classic
+     * Collection" ↔ "30th Celebration: Classic Collection"), again with the same card count.
      */
     fun match(tcgdex: List<TcgSetBrief>, ptcg: List<PtcgSet>): Map<String, String> {
         val byName = ptcg.associateBy { norm(it.name) }
@@ -80,6 +115,7 @@ object FallbackImages {
                 ?: byId[t.id.lowercase()]
                 ?: idVariants(t.id).firstNotNullOfOrNull { v -> byId[v]?.takeIf(::sameCount) }
                 ?: ptcg.filter { p -> val pn = norm(p.name); (pn.endsWith(n) || n.endsWith(pn)) && sameCount(p) }.singleOrNull()
+                ?: words(t.name).let { tw -> ptcg.filter { p -> sameCount(p) && wordsWithin(tw, words(p.name)) }.singleOrNull() }
             if (hit != null) out[t.id] = hit.id
         }
         return out
@@ -98,6 +134,7 @@ class FallbackImageSets(context: Context, private val http: OkHttpClient, privat
         }
         val stale = !file.exists() || System.currentTimeMillis() - file.lastModified() > 7L * 24 * 3600 * 1000
         val sets = (if (cached == null || stale) fetch() else null) ?: cached ?: return
+        FallbackImages.scrydexSets = sets.filter { it.onScrydex }.map { it.id }.toSet()
         FallbackImages.setIds = FallbackImages.match(catalog.sets("en"), sets)
     }
 

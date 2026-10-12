@@ -324,6 +324,33 @@ class FallbackImagesTest {
         assertNull(FallbackImages.base(null, "ja", "sm7.5", "3"))
         FallbackImages.setIds = emptyMap()
     }
+
+    @Test fun newerSetsUseTheNewPictureServer() {
+        val sets = listOf(
+            com.poketrader.data.PtcgSet("me2", "Phantasmal Flames", 94, 130, com.poketrader.data.PtcgSetImages("https://images.pokemontcg.io/me2/symbol.png")),
+            com.poketrader.data.PtcgSet("me55c", "30th Celebration: Classic Collection", 30, 30, com.poketrader.data.PtcgSetImages("https://images.scrydex.com/pokemon/me55c-symbol/symbol")),
+        )
+        assertEquals(listOf(false, true), sets.map { it.onScrydex })
+        FallbackImages.scrydexSets = sets.filter { it.onScrydex }.map { it.id }.toSet()
+        FallbackImages.setIds = mapOf("30th-c" to "me55c", "me02" to "me2")
+        val newer = FallbackImages.base(null, "en", "30th-c", "001")
+        assertEquals("https://images.scrydex.com/pokemon/me55c-1/small", FallbackImages.thumb(newer))
+        assertEquals("https://images.scrydex.com/pokemon/me55c-1/large", FallbackImages.large(newer))
+        // Older sets stay on the old server.
+        assertEquals("https://images.pokemontcg.io/me2/7.png", FallbackImages.thumb(FallbackImages.base(null, "en", "me02", "007")))
+        FallbackImages.setIds = emptyMap()
+        FallbackImages.scrydexSets = emptySet()
+    }
+
+    @Test fun matchesNamesWithAnExtraWord() {
+        val ptcg = listOf(p("me55", "30th Celebration", 128), p("me55c", "30th Celebration: Classic Collection", 30), p("cel25c", "Celebrations: Classic Collection", 25))
+        val m = FallbackImages.match(listOf(t("30th", "30th Celebration", 128), t("30th-c", "30th Classic Collection", 30), t("cel25c", "Celebrations Classic Collection", 25)), ptcg)
+        assertEquals("me55", m["30th"])
+        assertEquals("me55c", m["30th-c"])
+        assertEquals("cel25c", m["cel25c"])
+        // Same words but another card count: not the same set.
+        assertNull(FallbackImages.match(listOf(t("x", "30th Classic Collection", 31)), ptcg)["x"])
+    }
 }
 
 class SearchTextAndTrendTest {

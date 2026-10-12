@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.18.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.19.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.18-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.19-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -132,7 +132,8 @@ reverse holo" set it by hand, as before.
 - 1st Edition and Shadowless vintage cards share one Cardmarket product, so 1st Edition can be under-priced — the app
   warns and offers an "agreed price".
 - Card pictures come from TCGdex. For international cards TCGdex has no picture for (some promos and special
-  collections), the app falls back to pokemontcg.io's image server, matching sets via pokemontcg.io's set list on
+  collections), the app falls back to pokemontcg.io's image servers (images.pokemontcg.io, and images.scrydex.com for sets from
+  2026 on, as its set list says), matching sets via pokemontcg.io's set list on
   GitHub. As a last resort it uses TCGplayer's product picture (TCGdex lists a TCGplayer product id for most
   international and some Japanese cards; the id lookup is cached on the phone). Cards with no picture in any of
   these (still many Japanese ones) show name + number + "no picture".
