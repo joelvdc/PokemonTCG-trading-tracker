@@ -31,6 +31,24 @@ Decided with the owner (2026-10-12):
 - **While TCGplayer or Card Kingdom is the price source:** still sort by Cardmarket's change, and say so in the sort
   dialog.
 
+### 2. Pictures for Japanese Mega-era cards
+*Added 2026-10-16, from the health check of that day.*
+
+Owner's wording: "Add the Pokémon app task to its todo.md" (the health check's note below).
+
+What the health check found: TCGdex lists the Japanese Mega-era sets (M-P, M1L to M6, MC) without any card pictures,
+and the English 30th Classic Collection (30th-c) has none either. Limitless TCG does have the Japanese pictures (checked
+for M6/1). The app's backup picture source, pokemontcg.io / Scrydex (`FallbackImages.base()` in
+`data/FallbackImages.kt`), covers English cards only, so a Japanese card that TCGdex lists without a picture gets none.
+The Limitless fallback (`data/LimitlessCards.kt`) only steps in for cards TCGdex doesn't list at all.
+
+Idea: when TCGdex has a Japanese card but no picture for it, use Limitless TCG's picture (its image server's
+`tpc/<set>/<set>_<n>_R_JP` address).
+
+Open questions:
+- Do you own Japanese Mega-era cards, and do they show without a picture today?
+- Does 30th Classic Collection show its pictures? (The health check says they load from Scrydex, so probably yes.)
+
 ## Done
 
 *(nothing yet)*
