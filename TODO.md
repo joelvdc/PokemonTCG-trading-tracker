@@ -136,18 +136,24 @@ the wishlist (item 8) and the alert level (item 9). A price typed in another cur
 "≈ 74,61 kr." under it. Switching the button with an amount in the field converts it (300 kr. → 40,21 €, and back to
 exactly 300,00 kr.); with an empty field it only changes the currency. A new field starts on the currency picked last.
 
-Open question:
-- In MTG, purchase and agreed prices are still saved in euros, so a price typed as 300 kr. can later show as
-  301,20 kr. when the rate moves. Only alert levels keep their own currency. Is that fine, or should purchase prices
-  also keep the currency they were typed in? That would mean a database change (see item 7's note).
+Decided with the owner (2026-10-25):
+- **Purchase prices keep the currency they were typed in** (300 kr. stays 300 kr. whatever the rate does). This goes
+  further than MTG, which converts purchase and agreed prices to euros at the day's rate and keeps only alert levels
+  in their own currency.
+
+Still to settle when planning:
+- The same for agreed prices in a trade?
+- Totals that mix currencies (paid and worth, stats) convert each price at today's rate; CSV backups get the amount
+  and its currency in a new column (and older files, without that column, are read as euros).
+- A new database column: older versions on another phone can't read it, so ask before building it (CLAUDE.md,
+  "still ask first").
 
 ### 14. The scanner list jumps to the newest card
 *From MTG Trader 1.52.* Owner's wording: "the shown order of the cards scan". Poké's list under the camera already
 puts the newest card on top, but it doesn't scroll: once you've scrolled down, a new card is added above what you
 see. As in MTG, the list should jump to the top each time a card is added, so the last card scanned is always in sight.
 
-Open question:
-- Is this what you meant, or (also) the order of the waiting list on the Scan tab?
+Confirmed by the owner (2026-10-25): the list under the camera, not the Scan tab's waiting list.
 
 ## Done
 
