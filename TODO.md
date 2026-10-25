@@ -10,6 +10,21 @@ How to use this file:
 
 ## Collecting
 
+### Release plan
+*Green light for the list and the plan given by the owner on 2026-10-25.*
+
+**Poké Trader 1.20, one release:** items 1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13 and 14. Item 7 (graded cards) waits:
+"we have no graded cards, so do not go forward with this change now". Item 2 (Japanese Mega-era pictures) wasn't
+part of this round.
+
+Decided with the owner (2026-10-25):
+- Agreed prices in trades keep their currency too (item 13).
+- When copies with prices in different currencies join one stack, the app asks which currency the stack gets.
+- Offline wishlist names: English only (Cardmarket's list); Japanese cards wait until online (item 10).
+- Sync (item 11): the owner's two phones; the son has no phone.
+- Database changes approved: the price currencies, the wishlist's status and alert columns, and the sync ids (no
+  grader or grade columns for now).
+
 ### 1. Sort the collection by value change
 *Added 2026-10-12. Also on the MTG Trader to-do list.*
 
