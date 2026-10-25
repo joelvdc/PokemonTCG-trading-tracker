@@ -125,6 +125,9 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
     var message by remember { mutableStateOf<String?>(null) }
     var opening by remember { mutableStateOf<CardRef?>(null) }
     val focus = remember { FocusRequester() }
+    // Offline on the wishlist (since 1.20): names from Cardmarket's product list on the phone.
+    var offline by remember { mutableStateOf<List<com.poketrader.data.CmProduct>?>(null) }
+    var addingOffline by remember { mutableStateOf<com.poketrader.data.CmProduct?>(null) }
 
     LaunchedEffect(Unit) { if (initialQuery == null) focus.requestFocus() }
 
@@ -142,8 +145,16 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                 .sortedWith(compareBy({ !it.startsWith(q, ignoreCase = true) }, { it.length }))
                 .take(40)
             message = null
+            offline = null
         } catch (e: Exception) {
-            message = "Can't reach the card database — check the internet connection."
+            if (target == CardTarget.Wishlist && lang == "en") {
+                val dao = c.db.catalogDao()
+                offline = runCatching { dao.named(q) + dao.containing(q) }.getOrDefault(emptyList())
+                message = if (offline.isNullOrEmpty()) "Offline, and Cardmarket's card list on the phone has no card by that name."
+                else "Offline: these names come from Cardmarket's card list on the phone. The card's details follow when you're online."
+            } else {
+                message = "Can't reach the card database — check the internet connection."
+            }
         }
     }
 
@@ -238,7 +249,18 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
             val all = hits
             val filter = NumberFilter.parse(numberText)
             val h = if (all == null || filter.isEmpty) all else all.filter { filter.matches(it.brief.localId, it.setOfficial, it.setTotal) }
+            val offlineHits = offline
             when {
+                selectedName == null && !offlineHits.isNullOrEmpty() -> LazyColumn {
+                    items(offlineHits, key = { it.idProduct }) { p ->
+                        ListItem(
+                            headlineContent = { Text(com.poketrader.data.CatalogMatch.baseName(p.name), style = MaterialTheme.typography.titleMedium) },
+                            supportingContent = { com.poketrader.data.CatalogMatch.attacks(p.name).takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · ")) } },
+                            modifier = Modifier.clickable { addingOffline = p },
+                        )
+                        HorizontalDivider()
+                    }
+                }
                 selectedName == null -> LazyColumn {
                     items(suggestions) { name ->
                         ListItem(
@@ -281,6 +303,29 @@ fun SearchScreen(nav: NavController, target: CardTarget, initialQuery: String?) 
                 }
             }
         }
+    }
+
+    addingOffline?.let { p ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { addingOffline = null },
+            title = { Text("Add ${com.poketrader.data.CatalogMatch.baseName(p.name)} to the wishlist?") },
+            text = {
+                Text(
+                    "As “any version”. Its set, number and picture are filled in by themselves once the phone is back online." +
+                        (com.poketrader.data.CatalogMatch.attacks(p.name).takeIf { it.isNotEmpty() }?.let { "\n\nAttacks: ${it.joinToString(", ")}" } ?: ""),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    addingOffline = null
+                    scope.launch {
+                        val r = c.repo.addPendingToWishlist(p)
+                        if (snackbar.showUndo("Added ${com.poketrader.data.CatalogMatch.baseName(p.name)} to the wishlist")) c.repo.undoAdd(r)
+                    }
+                }) { Text("Add") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { addingOffline = null }) { Text("Cancel") } },
+        )
     }
 
     opening?.let { card ->

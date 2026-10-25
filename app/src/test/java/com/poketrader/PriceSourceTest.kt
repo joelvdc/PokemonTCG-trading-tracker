@@ -117,7 +117,7 @@ class PriceSourceTest {
         sql.version = 4
         sql.close()
         // Room checks the result against what this version expects.
-        val db = Room.databaseBuilder(context, AppDatabase::class.java, "update-5.db").addMigrations(AppDatabase.MIGRATION_4_5).build()
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, "update-5.db").addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).build()
         try {
             db.sourcePriceDao().putAll(listOf(SourcePrice("a|en|normal", "tcgplayer", 2.5)))
             assertEquals(1, db.sourcePriceDao().forKeys(listOf("a|en|normal")).size)

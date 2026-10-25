@@ -96,7 +96,10 @@ class ValueHistory(private val db: AppDatabase) {
          * many you own (since 1.20; before, over all copies). The same change the collection sorts by.
          */
         fun biggestMoves(rows: List<CollectionRow>, up: Boolean, count: Int = 5): List<PriceMove> =
-            rows.mapNotNull { r -> r.change?.let { PriceMove(r, it.money, it.pct) } }
+            // One line per card version, even when its copies are in several binders or conditions.
+            rows.groupBy { Triple(it.item.card.cardId, it.item.card.dataLang, it.item.card.variantId) }.values
+                .map { same -> same.maxBy { it.item.quantity } }
+                .mapNotNull { r -> r.change?.let { PriceMove(r, it.money, it.pct) } }
                 .filter { if (up) it.change > 0 else it.change < 0 }
                 .sortedBy { if (up) -it.change else it.change }
                 .take(count)

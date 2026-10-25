@@ -169,6 +169,17 @@ fun AppNav() {
                 ScannerScreen(nav, CardTarget.decode(it.arguments?.getString("target") ?: "collection"))
             }
         }
+        // The other phone still runs a version that can't read this one's sync file (since 1.20).
+        OlderPhoneDialog()
+    }
+    // A price alert's notification: the Collection tab, where the wishlist opens the card (since 1.20).
+    val openWish by c.openWish.collectAsStateWithLifecycle()
+    LaunchedEffect(openWish) {
+        if (openWish != null) nav.navigate("collection") {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 }
 

@@ -256,7 +256,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                                 paidInput.text = it
                                 v = v.copy(purchasePrice = paidInput.amount, purchaseCurrency = paidInput.code)
                             },
-                            Modifier.weight(0.38f), placeholder = "0.00", keyboardType = KeyboardType.Decimal,
+                            Modifier.weight(0.46f), placeholder = "0.00", keyboardType = KeyboardType.Decimal,
                             note = convertedHint(paidInput),
                         ) {
                             // The currency it was paid in, kept with the price (since 1.20).
@@ -266,7 +266,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                                 v = v.copy(purchasePrice = paidInput.amount, purchaseCurrency = paidInput.code)
                             }
                         }
-                        CompactTextField("Notes", v.notes ?: "", { v = v.copy(notes = it.ifBlank { null }) }, Modifier.weight(0.62f), placeholder = "Where from, condition…", singleLine = false)
+                        CompactTextField("Notes", v.notes ?: "", { v = v.copy(notes = it.ifBlank { null }) }, Modifier.weight(0.54f), placeholder = "Where from, condition…", singleLine = false)
                     }
                     val paid = paidInput.eur
                     if (paid != null && paid > 0 && now != null) {

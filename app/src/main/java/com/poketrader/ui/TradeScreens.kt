@@ -231,7 +231,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
     val owned by remember { c.db.collectionDao().observeOwned() }.collectAsStateWithLifecycle(emptyList())
     val ownedMap = remember(owned) { owned.associate { it.cardId to it.qty } }
     val wishRows by remember { c.db.wishlistDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
-    val wanted = remember(wishRows) { wishRows.map { it.item.card.cardId }.toSet() }
+    val wanted = remember(wishRows) { wishRows.filter { it.item.receivedAt == null }.map { it.item.card.cardId }.toSet() }
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
     val tolerance by c.settings.tolerancePct.collectAsStateWithLifecycle()
     val columns by c.settings.tradeColumns.collectAsStateWithLifecycle()

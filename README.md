@@ -19,10 +19,10 @@ this page's releases and tells you when there's a new version. Tap the badge abo
 `https://github.com/joelvdc/PokemonTCG-trading-tracker` in Obtainium by hand). When it asks which file to install,
 pick `PokeTrader-<version>.apk`, or the `-universal` one if that won't install.
 
-**By hand:** download `PokeTrader-1.19.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
+**By hand:** download `PokeTrader-1.20.apk` from the [latest release](https://github.com/joelvdc/PokemonTCG-trading-tracker/releases/latest),
 open it on the phone and allow "install unknown apps" for your browser or file manager when asked. It's built for
 64-bit ARM phones (practically every phone from the last ~6 years). If it refuses to install, use
-`PokeTrader-1.19-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
+`PokeTrader-1.20-universal.apk` instead (bigger, runs on any device). Updates install over the old version and keep
 your cards.
 
 ## Binders
@@ -33,11 +33,30 @@ binder. "We traded!" asks which binder the new cards go into (or makes a new one
 Unsorted first. The CSV backup keeps each card's binder. Card tiles show the price of one card, with the total for a
 stack underneath ("×4 · €80.00"), and "Most valuable" sorts by that single-card price.
 
+**Arrange binders:** ⋮ → **Arrange binders…** lists Unsorted, the Wishlist and every binder; move each up or down with
+its arrows. The bar above the collection and the binder lists ("Move to", "Put it in"…) follow that order; **All**
+always comes first and new binders go at the end. The order is synced to your other phone.
+
+**Selecting cards:** press and hold a card (in any view, or ⋮ → **Select cards**), then tap more; **Select all shown**
+picks every card the search and filters show. The bar at the top shows how many cards and their value, with
+**Move to binder…**, **Add to a trade** (on the "I give" side of an open trade or a new one), **Delete** (asks first and
+makes a restore point) and, under ⋮, **Edit condition, language, price…** (only what you change is changed; stacks
+that become the same are combined), **Share as a list**, **Copy as a list** and **Export as CSV**. Every action can be
+undone right after.
+
+**Swiping cards** (list and compact views): **swipe right = Move to binder…**, **swipe left = Add to a trade…** by
+default; for a stack of several copies, the window asks how many. Settings → **Swiping cards in the collection** sets
+each direction to: move to binder, add to a trade, one copy more, one copy less, add to the wishlist, or nothing.
+Every swipe can be undone.
+
 The collection can be shown as **cards** (big pictures, the default), a **list** (small picture, set and number, tags and
 price) or **compact** (one text line per card); pick it with the view button next to Sort.
 
 **Sort** works in layers: e.g. rarest first, then by name, then by set. Each layer can be reversed, there are ready-made
-choices (name, set and number, rarest, most valuable, newest), and the app remembers your sort. **Filter** narrows the
+choices (name, set and number, rarest, most valuable, newest, rising lately, falling lately), and the app remembers
+your sort. **Change in %** and **Change in money** sort by how the price moved lately, biggest rise or biggest fall
+first: Cardmarket's trend price against its 30-day average for one card (also while TCGplayer is your price source);
+cards without a 30-day average go last. **Filter** narrows the
 cards by set, rarity, version (holo, reverse holo…), international or Japanese print, condition, language and price;
 active filters show as chips under the search field, tap one's ✕ to drop it.
 
@@ -48,9 +67,20 @@ copy of the card with the same name (same card first, then by value; tap one to 
 into one line (tap for all). Save only lights up once something has changed. Notes and purchase price are kept in the
 CSV backup.
 
+**Prices in the currency you paid in** (since 1.20): every price field (what you paid, an agreed price in a trade, a
+wishlist card's alert level) has a small **€ ▾ / kr. ▾ / $ ▾** button. Type the amount as you paid it; the field says
+what it comes to in the currency the app shows ("≈ €20.00"). The price is **kept in that currency**: 300 kr. stays
+300 kr. whatever the exchange rate does; totals (Paid and worth, stats) count it at today's rate. Picking another
+currency for an amount already there converts it, and back again gives exactly the same amount. A new price field
+starts on the currency you chose last. When cards join a stack (moving, merging binders, editing) whose price is in
+another currency, the app asks which currency the stack keeps; the stack gets the average paid, weighted by copies.
+The CSV backup has a "Purchase currency" column (older files are read as euros).
+
 **Value over time:** tap the total above the cards (or ⋮ → Value over time). The app saves the collection's value once
-a day, so the chart fills in as days go by; underneath are the cards rising and falling most lately (tap one to open it).
-The chips at the top switch between all cards, Unsorted and each binder (binder values are saved from version 1.14 on).
+a day, so the chart fills in as days go by. Underneath: **Paid and worth** (what you paid for the cards that have a
+purchase price against what they're worth now, with your best and worst buys), then the cards rising and falling most
+lately, per card (one copy, the same change the collection can be sorted by); tap one to open it. The chips at the top
+switch between all cards, Unsorted and each binder (binder values are saved from version 1.14 on).
 
 **Collection stats:** the pie-chart button next to the total (or ⋮ → Collection stats). For all cards or one binder,
 counted by cards or by value: totals (and what you paid against what those cards are worth now), rarity (rarest
@@ -68,9 +98,66 @@ left, get on the right, like the cards on the table). The app remembers your cho
 
 ## Wishlist
 The **★ Wishlist** in the binder bar holds the cards you want: pick it, then scan or search them. Any version of the card
-counts unless you limit it to one (e.g. only the reverse holo). Each card shows whether you have it, "Remove the cards I
-got since adding them" (⋮ menu) clears what you've got since, and cards on the wishlist show "★ on your wishlist" on the
-"I get" side of a trade. The wishlist can be shared as a list and isn't counted in the collection's value.
+counts unless you limit it to one (e.g. only the reverse holo). Each card shows whether you have it, and cards on the
+wishlist show "★ on your wishlist" on the "I get" side of a trade. The wishlist can be shared as a list (ordered and
+received cards are left out) and isn't counted in the collection's value.
+
+**Sections** (since 1.20): **To buy**, **Ordered** and **Received**, each with its card count; tap a section's header to
+fold it (Received starts folded). With "Ordered cards in their own section" off (the view menu) it's one list with the
+ordered cards last, and Received below.
+
+**Swiping right moves a card one step on:** **To buy → Ordered → Received → the collection.** Tick the "Ordered" box on a
+card (or in its window) once you've bought it. A received card stays in Received with the date, as a record: it no longer
+counts as wanted (no ★ in trades, no price alerts). Swiped right in Received, it goes into the collection: a window asks
+the version, condition, language, copies, binder and what you paid. **Swipe left** to delete. Every swipe can be undone.
+The ⋮ menu has **Mark all ordered cards as received**, **Mark the cards I now own as received** (cards you got more copies
+of since adding them; shown in a list first) and **Clear received cards**. Settings → **Received wishlist cards** clears
+them by themselves after 1, 3, 6 or 12 months, and can add received cards to Unsorted right away. Press and hold to
+select several (Ordered, Received, Delete, Back on the wishlist…).
+
+**Price alerts** (since 1.20): open a wishlist card and fill in "Notify me at or below" (in any currency; it keeps the
+currency you typed). When the card costs that much or less you get one notification; tapping it opens the card. A new one
+only comes after the price has been above your level again, or when you change the level. "Any version" cards are
+compared at their cheapest version. Prices are checked after each price update (when the app opens, and every few hours
+in the background, so "Update automatically" must be on); Android 13 and later ask once whether Poké Trader may send
+notifications. Settings → **Wishlist price alerts** chooses Cardmarket's price for alerts: lowest listing (the default),
+trend, or an average. The wishlist shows each card's level under it ("🔔 €0.67 ✓" once reached). Each phone checks and
+notifies by itself.
+
+**Offline:** without internet, "Add card" on the wishlist suggests names from Cardmarket's card list saved on the phone
+(English names, with the card's attacks). The card goes on the wishlist as "any version", marked "details follow when
+you're online"; its set, number and picture are filled in once the phone is back online.
+
+## Sync between phones
+Settings → **Sync with Nextcloud** (since 1.20) keeps the collection, binders, wishlist, trades, scans and settings the
+same on your phones, using a file (`sync.json.gz`) in a folder of your own [Nextcloud](https://nextcloud.com/). Prices
+and pictures aren't synced; each phone downloads those itself.
+- **Connect:** enter your server address and log in in the browser; the app gets its own app password, which you can
+  revoke in Nextcloud (Settings → Security). An app password made by hand works too. Disconnecting removes the app's
+  app password and leaves your data where it is.
+- **Folder:** after logging in you pick the folder for the sync file: browse your Nextcloud folders, make a new one, or
+  keep the usual "Poké Trader". Pick the same folder on both phones, and not MTG Trader's. Settings → Folder →
+  **Change** moves syncing to another folder (the old file stays where it was).
+- **First sync:** if both the phone and Nextcloud already hold data, you choose: merge both, use the Nextcloud copy, or
+  start from this phone. A restore point is made first.
+- **After that** changes are merged item by item: the most recent change to a card stack, binder, trade, scan or wishlist
+  card wins, and deletions carry over. With **Sync automatically** on, it syncs when you open the app, about 30 seconds
+  after a change, when you leave the app and every hour; **Only on Wi-Fi** keeps automatic syncs off mobile data.
+  "Sync now" always works.
+
+The password is stored encrypted with a key kept in the phone's keystore.
+
+## Backups and restore points
+Settings → **Backups** (since 1.20) keeps restore points of everything the app syncs (collection, binders, trades, scans,
+wishlist and settings).
+- They're made **every day** when something changed, and before big changes: the first Nextcloud sync, CSV imports,
+  deleting selected cards and restoring a backup. **Back up now** makes one you keep until you delete it.
+- With Nextcloud sync they go to a **Backups** folder next to the sync file, where both phones can use them; otherwise
+  they're kept on the phone, in the app's storage or (better, as they survive uninstalling) a folder you choose.
+  **Save to a file…** and **Restore from a file…** work with any file you keep elsewhere.
+- Kept: the latest 10 automatic backups and one per week for 8 weeks.
+- **Restoring** shows what differs from now, makes a backup of the current state first and then replaces the app's
+  data. Your other phone gets the restored data through Nextcloud.
 
 ## Appearance
 Settings → **Appearance**: same as the phone, light or dark.
@@ -79,7 +166,8 @@ Settings → **Appearance**: same as the phone, light or dark.
 Scan a pile of cards (or add them by name) into a waiting list, then select some or all of them and send them **to a
 binder** or **to a trade**, or **discard** them.
 
-While scanning, every card that's added shows up in a list under the camera with its price: **+** adds another copy,
+While scanning, every card that's added shows up in a list under the camera with its price, the newest on top (the list
+jumps back to it each time a card is added): **+** adds another copy,
 the undo arrow takes it back, and tapping it lets you change the version, condition, language and **number of copies**.
 Prices follow the price type chosen in Settings. Every card window has **Other printing…**, which shows all printings
 of the card (other sets, promos, numbers) as pictures to pick from.
@@ -185,6 +273,8 @@ gradlew recordRoborazziDebug   (redraw the pictures after an intended change, th
 - `data/CollectionStats.kt` – the numbers behind the stats screen (`ui/StatsScreen.kt`).
 - `data/PriceGuideRepository.kt` – Cardmarket price guide download/import.
 - `data/Repository.kt` – trades, collection, apply/undo, CSV.
+- `data/Sync*.kt`, `data/Nextcloud.kt`, `data/Backups.kt` – sync between phones and restore points (as in MTG Trader).
+- `data/PriceAlerts.kt` – wishlist price alerts; `data/PurchasePrices.kt` – stacks' average paid and its currency.
 - `scan/CardTextParser.kt` – reads name / number / set code / language from OCR lines.
 - `scan/CardRecognizer.kt` – turns those clues into a card (or a "which one is it?" choice).
 - `ui/` – Compose screens.
