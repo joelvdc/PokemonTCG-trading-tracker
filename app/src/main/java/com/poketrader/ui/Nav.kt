@@ -72,6 +72,9 @@ fun AppNav() {
     val c = LocalContext.current.container
     LaunchedEffect(Unit) {
         c.updater.schedule()
+        // Sync with the other phone, and today's restore point if due (since 1.20).
+        c.sync.onAppStart()
+        c.appScope.launch { c.backups.dailyIfDue() }
         c.appScope.launch {
             c.updater.autoUpdate()
             c.updater.repairAfterUpgrade()
@@ -139,9 +142,10 @@ fun AppNav() {
             composable("trades") { TradesListScreen(nav) }
             composable("collection") { CollectionScreen(nav) }
             composable("scans") { ScansScreen(nav) }
-            composable("settings") { SettingsScreen() }
+            composable("settings") { SettingsScreen(nav) }
             composable("value") { ValueScreen(nav) }
             composable("stats") { StatsScreen(nav) }
+            composable("backups") { BackupsScreen(nav) }
             composable("trade/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                 TradeEditorScreen(nav, it.arguments?.getLong("id") ?: 0L)
             }

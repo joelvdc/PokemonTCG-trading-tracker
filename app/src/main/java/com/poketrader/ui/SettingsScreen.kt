@@ -1,5 +1,12 @@
 package com.poketrader.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
+import com.poketrader.data.ReceivedClear
+import com.poketrader.data.SwipeAction
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +56,7 @@ private val typeHelp = mapOf(
 )
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(nav: androidx.navigation.NavController) {
     val c = LocalContext.current.container
     val priceType by c.settings.priceType.collectAsStateWithLifecycle()
     val tolerance by c.settings.tolerancePct.collectAsStateWithLifecycle()
@@ -67,6 +74,16 @@ fun SettingsScreen() {
     val sourceStatus by c.priceSources.status.collectAsStateWithLifecycle()
     val currency by c.settings.currency.collectAsStateWithLifecycle()
     val rates by c.exchangeRates.rates.collectAsStateWithLifecycle()
+    val alertType by c.settings.alertPriceType.collectAsStateWithLifecycle()
+    val receivedClear by c.settings.receivedClear.collectAsStateWithLifecycle()
+    val toCollection by c.settings.receivedToCollection.collectAsStateWithLifecycle()
+    val swipeRight by c.settings.swipeRight.collectAsStateWithLifecycle()
+    val swipeLeft by c.settings.swipeLeft.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var notificationsAllowed by remember { mutableStateOf(c.wishWatch.notifier.allowed()) }
+    val notificationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { notificationsAllowed = c.wishWatch.notifier.allowed() }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -111,6 +128,20 @@ fun SettingsScreen() {
                     Text(m.label)
                 }
             }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            SwipeSection(swipeRight, swipeLeft, c.settings::setSwipe)
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            WishlistAlertsSection(priceSource, alertType, autoUpdate, notificationsAllowed, onAllow = {
+                if (android.os.Build.VERSION.SDK_INT >= 33) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                else context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            }) { t -> c.settings.setAlertPriceType(t); c.wishWatch.checkSoon(c.appScope) }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            ReceivedCardsSection(receivedClear, toCollection, c.settings::setReceivedClear, c.settings::setReceivedToCollection)
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             Text("Fair trade margin: ±$tolerance%", style = MaterialTheme.typography.titleMedium)
@@ -168,6 +199,19 @@ fun SettingsScreen() {
             )
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            SyncSection()
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            Text("Backups", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (c.backups.lastBackupAt == 0L) "Restore points of all your data, on Nextcloud or on this phone." else "Last backup: ${Fmt.dateTime(c.backups.lastBackupAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { nav.navigate("backups") }) { Text("Backups and restore…") }
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             Text("About", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Card data and pictures come from TCGdex (tcgdex.net); prices come from Cardmarket's public daily Pokémon price guide (EUR). " +
@@ -180,8 +224,83 @@ fun SettingsScreen() {
     }
 }
 
+/** Settings → Swiping cards in the collection: what a swipe to the right and to the left does. Since 1.20. */
 @Composable
-private fun SwitchRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
+internal fun SwipeSection(right: SwipeAction, left: SwipeAction, onPick: (right: Boolean, SwipeAction) -> Unit) {
+    Text("Swiping cards in the collection", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "In the list and compact views; every swipe can be undone. Press and hold a card to select several (in every view).",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    DropdownSelector("Swipe right →", right, SwipeAction.entries.toList(), { it.label }, { onPick(true, it) }, Modifier.fillMaxWidth())
+    Spacer(Modifier.height(8.dp))
+    DropdownSelector("← Swipe left", left, SwipeAction.entries.toList(), { it.label }, { onPick(false, it) }, Modifier.fillMaxWidth())
+}
+
+/** Settings → Wishlist price alerts: what alerts compare against, and notifications. Since 1.20. */
+@Composable
+internal fun WishlistAlertsSection(
+    source: PriceSource,
+    alertType: PriceType,
+    autoUpdate: Boolean,
+    notificationsAllowed: Boolean,
+    onAllow: () -> Unit,
+    onAlertType: (PriceType) -> Unit,
+) {
+    val small = MaterialTheme.typography.bodySmall
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Text("Wishlist price alerts", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Open a card on the wishlist and set a price: you get a notification when it costs that much or less " +
+            "(for “any version” cards, the cheapest version). Prices are checked when they update, a few times a day.",
+        style = small, color = muted,
+    )
+    if (!autoUpdate) {
+        Text(
+            "“Update automatically” is off (below), so prices, and alerts, only update when you tap “Update now”.",
+            style = small, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+    if (!notificationsAllowed) {
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Notifications are off for Poké Trader.", Modifier.weight(1f), style = small, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = onAllow) { Text("Allow") }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    if (source == PriceSource.CARDMARKET) {
+        DropdownSelector("Cardmarket price for alerts", alertType, PriceType.entries.toList(), { it.label }, onAlertType, Modifier.fillMaxWidth())
+        Text(typeHelp[alertType] ?: "", style = small, color = muted)
+    } else {
+        Text("Alerts use ${source.label}'s price, the price source chosen at the top.", style = small, color = muted)
+    }
+}
+
+/** Settings → Received wishlist cards: when they're cleared, and whether they also go into the collection. Since 1.20. */
+@Composable
+internal fun ReceivedCardsSection(clear: ReceivedClear, toCollection: Boolean, onClear: (ReceivedClear) -> Unit, onToCollection: (Boolean) -> Unit) {
+    Text("Received wishlist cards", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Swipe a wishlist card to the right (or tick “Received” in its window) once it has arrived: it moves to the wishlist's " +
+            "Received section, as a record. They're kept until you clear them (⋮ → Clear received cards), or as chosen here.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    DropdownSelector("Clear received cards automatically", clear, ReceivedClear.entries.toList(), { it.label }, onClear, Modifier.fillMaxWidth())
+    Spacer(Modifier.height(4.dp))
+    SwitchRow(
+        title = "Add received cards to the collection",
+        body = "Each card goes into Unsorted (near mint, its version) when you mark it received. Off: swipe it on from Received to choose the binder, condition and price.",
+        checked = toCollection,
+        onChange = onToCollection,
+    )
+}
+
+@Composable
+internal fun SwitchRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
     Row(
         Modifier.fillMaxWidth().clickable(enabled = enabled) { onChange(!checked) }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

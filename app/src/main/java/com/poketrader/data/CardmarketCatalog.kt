@@ -57,6 +57,14 @@ interface CatalogDao {
     @Query("SELECT COUNT(*) FROM cm_products")
     suspend fun count(): Int
 
+    /** Products whose name starts with [prefix], for adding wishlist cards offline (since 1.20). */
+    @Query("SELECT * FROM cm_products WHERE name LIKE :prefix || '%' ORDER BY name LIMIT :max")
+    suspend fun named(prefix: String, max: Int = 40): List<CmProduct>
+
+    /** Products whose name contains [part] (not at the start). */
+    @Query("SELECT * FROM cm_products WHERE name LIKE '%' || :part || '%' AND name NOT LIKE :part || '%' ORDER BY name LIMIT :max")
+    suspend fun containing(part: String, max: Int = 20): List<CmProduct>
+
     @Query("SELECT COUNT(*) FROM cm_products")
     fun observeCount(): Flow<Int>
 

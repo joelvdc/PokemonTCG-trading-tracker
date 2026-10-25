@@ -46,7 +46,7 @@ class Settings(context: Context) {
 
     fun setPriceSource(s: PriceSource) {
         _priceSource.value = s
-        prefs.edit().putString("priceSource", s.key).apply()
+        prefs.edit().putString("priceSource", s.key).stamp().apply()
     }
 
     private val _currency = MutableStateFlow(AppCurrency.fromKey(prefs.getString("currency", null)))
@@ -55,7 +55,7 @@ class Settings(context: Context) {
 
     fun setCurrency(c: AppCurrency) {
         _currency.value = c
-        prefs.edit().putString("currency", c.name).apply()
+        prefs.edit().putString("currency", c.name).stamp().apply()
     }
 
     /** The currency last chosen in a price field (see [com.poketrader.ui.TypedCurrency]); kept per phone. Since 1.20. */
@@ -92,7 +92,7 @@ class Settings(context: Context) {
 
     fun setCollectionView(v: CollectionView) {
         _collectionView.value = v
-        prefs.edit().putString("collectionView", v.name).apply()
+        prefs.edit().putString("collectionView", v.name).stamp().apply()
     }
 
     /** The collection's sort levels. Since 1.11. */
@@ -101,7 +101,7 @@ class Settings(context: Context) {
 
     fun setCollectionSort(v: SortSpec) {
         _collectionSort.value = v
-        prefs.edit().putString("collectionSort", v.encode()).apply()
+        prefs.edit().putString("collectionSort", v.encode()).stamp().apply()
     }
 
     /** The card page lists all your other copies of the card, not just the first few. Since 1.11. */
@@ -119,7 +119,7 @@ class Settings(context: Context) {
 
     fun setTradeColumns(v: Boolean) {
         _tradeColumns.value = v
-        prefs.edit().putBoolean("tradeColumns", v).apply()
+        prefs.edit().putBoolean("tradeColumns", v).stamp().apply()
     }
 
     /** How far saved cards' Cardmarket links have been checked; see [Repository.repairSavedCards]. */
@@ -145,17 +145,126 @@ class Settings(context: Context) {
 
     fun setPriceType(t: PriceType) {
         _priceType.value = t
-        prefs.edit().putString("priceType", t.key).apply()
+        prefs.edit().putString("priceType", t.key).stamp().apply()
     }
 
     fun setTolerance(pct: Int) {
         _tolerance.value = pct
-        prefs.edit().putInt("tolerancePct", pct).apply()
+        prefs.edit().putInt("tolerancePct", pct).stamp().apply()
     }
+
+
+    // ---- since 1.20 ----------------------------------------------------------------------
+
+    private val _wishSections = MutableStateFlow(prefs.getBoolean("wishSections", true))
+    /** The wishlist shows To buy, Ordered and Received as sections (else one list, ordered cards last). Since 1.20. */
+    val wishSections: StateFlow<Boolean> = _wishSections
+
+    fun setWishSections(on: Boolean) {
+        _wishSections.value = on
+        prefs.edit().putBoolean("wishSections", on).stamp().apply()
+    }
+
+    private val _receivedClear = MutableStateFlow(ReceivedClear.fromKey(prefs.getString("receivedClear", null)))
+    /** How long received wishlist cards are kept. Since 1.20. */
+    val receivedClear: StateFlow<ReceivedClear> = _receivedClear
+
+    fun setReceivedClear(v: ReceivedClear) {
+        _receivedClear.value = v
+        prefs.edit().putString("receivedClear", v.name).stamp().apply()
+    }
+
+    private val _receivedToCollection = MutableStateFlow(prefs.getBoolean("receivedToCollection", false))
+    /** Wishlist cards marked as received go into the collection (Unsorted) right away. Since 1.20. */
+    val receivedToCollection: StateFlow<Boolean> = _receivedToCollection
+
+    fun setReceivedToCollection(on: Boolean) {
+        _receivedToCollection.value = on
+        prefs.edit().putBoolean("receivedToCollection", on).stamp().apply()
+    }
+
+    private val _swipeRight = MutableStateFlow(SwipeAction.fromKey(prefs.getString("swipeRight", null), SwipeAction.DEFAULT_RIGHT))
+    /** What swiping a collection card to the right does. Since 1.20. */
+    val swipeRight: StateFlow<SwipeAction> = _swipeRight
+
+    private val _swipeLeft = MutableStateFlow(SwipeAction.fromKey(prefs.getString("swipeLeft", null), SwipeAction.DEFAULT_LEFT))
+    /** What swiping a collection card to the left does. Since 1.20. */
+    val swipeLeft: StateFlow<SwipeAction> = _swipeLeft
+
+    fun setSwipe(right: Boolean, v: SwipeAction) {
+        if (right) _swipeRight.value = v else _swipeLeft.value = v
+        prefs.edit().putString(if (right) "swipeRight" else "swipeLeft", v.key).stamp().apply()
+    }
+
+    private val _binderOrder = MutableStateFlow(BinderOrder.decode(prefs.getString("binderOrder", null)))
+    /** The binder bar's order, as arranged ([BinderOrder] keys). Since 1.20. */
+    val binderOrder: StateFlow<List<String>> = _binderOrder
+
+    fun setBinderOrder(keys: List<String>) {
+        _binderOrder.value = keys
+        prefs.edit().putString("binderOrder", BinderOrder.encode(keys)).stamp().apply()
+    }
+
+    private val _alertPriceType = MutableStateFlow(PriceType.fromKey(prefs.getString("alertPriceType", PriceType.LOW.key)))
+    /** Which Cardmarket price wishlist alerts compare (lowest listing by default). Since 1.20. */
+    val alertPriceType: StateFlow<PriceType> = _alertPriceType
+
+    fun setAlertPriceType(t: PriceType) {
+        _alertPriceType.value = t
+        prefs.edit().putString("alertPriceType", t.key).stamp().apply()
+    }
+
+    /** Preferences that follow the owner to their other phone through sync (with when they last changed). Since 1.20. */
+    fun syncedPrefs() = SyncPrefs(
+        updatedAt = prefs.getLong(PREFS_UPDATED_AT, 0L),
+        values = buildMap {
+            put("priceType", priceType.value.key)
+            put("currency", currency.value.name)
+            put("priceSource", priceSource.value.key)
+            put("tolerancePct", tolerancePct.value.toString())
+            put("collectionView", collectionView.value.name)
+            put("collectionSort", collectionSort.value.encode())
+            put("tradeColumns", tradeColumns.value.toString())
+            put("wishSections", wishSections.value.toString())
+            put("receivedClear", receivedClear.value.name)
+            put("receivedToCollection", receivedToCollection.value.toString())
+            put("swipeRight", swipeRight.value.key)
+            put("swipeLeft", swipeLeft.value.key)
+            put("binderOrder", BinderOrder.encode(binderOrder.value))
+            put("alertPriceType", alertPriceType.value.key)
+        },
+    )
+
+    /** Takes over preferences that came in through sync (without stamping them as changed here). */
+    fun applySyncedPrefs(p: SyncPrefs) {
+        val v = p.values
+        val e = prefs.edit()
+        v["priceType"]?.let { _priceType.value = PriceType.fromKey(it); e.putString("priceType", it) }
+        v["priceSource"]?.let { _priceSource.value = PriceSource.fromKey(it); e.putString("priceSource", it) }
+        v["currency"]?.let { _currency.value = AppCurrency.fromKey(it); e.putString("currency", it) }
+        v["tolerancePct"]?.toIntOrNull()?.let { _tolerance.value = it; e.putInt("tolerancePct", it) }
+        v["collectionView"]?.let { _collectionView.value = CollectionView.fromKey(it); e.putString("collectionView", it) }
+        v["collectionSort"]?.let { _collectionSort.value = SortSpec.decode(it); e.putString("collectionSort", it) }
+        v["tradeColumns"]?.toBooleanStrictOrNull()?.let { _tradeColumns.value = it; e.putBoolean("tradeColumns", it) }
+        v["wishSections"]?.toBooleanStrictOrNull()?.let { _wishSections.value = it; e.putBoolean("wishSections", it) }
+        v["receivedClear"]?.let { _receivedClear.value = ReceivedClear.fromKey(it); e.putString("receivedClear", it) }
+        v["receivedToCollection"]?.toBooleanStrictOrNull()?.let { _receivedToCollection.value = it; e.putBoolean("receivedToCollection", it) }
+        v["swipeRight"]?.let { _swipeRight.value = SwipeAction.fromKey(it, SwipeAction.DEFAULT_RIGHT); e.putString("swipeRight", it) }
+        v["swipeLeft"]?.let { _swipeLeft.value = SwipeAction.fromKey(it, SwipeAction.DEFAULT_LEFT); e.putString("swipeLeft", it) }
+        v["binderOrder"]?.let { _binderOrder.value = BinderOrder.decode(it); e.putString("binderOrder", it) }
+        v["alertPriceType"]?.let { _alertPriceType.value = PriceType.fromKey(it); e.putString("alertPriceType", it) }
+        e.putLong(PREFS_UPDATED_AT, p.updatedAt).apply()
+    }
+
+    private fun android.content.SharedPreferences.Editor.stamp() = putLong(PREFS_UPDATED_AT, System.currentTimeMillis())
 
     fun setPriceGuideFetched(createdAt: String?, at: Long) {
         _lastFetch.value = at
         _guideDate.value = createdAt
         prefs.edit().putLong("lastPriceFetch", at).putString("priceGuideDate", createdAt).apply()
+    }
+
+    companion object {
+        private const val PREFS_UPDATED_AT = "syncedPrefsUpdatedAt"
     }
 }

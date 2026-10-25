@@ -28,6 +28,8 @@ class DataUpdater(
     private val network: NetworkMonitor,
     private val history: ValueHistory,
     private val priceSources: PriceSourceStore,
+    private val wishWatch: WishlistWatch,
+    private val sets: SetCatalog,
 ) {
     private val lock = Mutex()
 
@@ -55,10 +57,17 @@ class DataUpdater(
         recordValue()
     }
 
-    /** Saves today's collection value for the value chart. */
+    /**
+     * Saves today's collection value for the value chart; then the wishlist: cards added offline get their
+     * details, old received cards are cleared, and price alerts are checked against the fresh prices
+     * (since 1.20).
+     */
     private suspend fun recordValue() {
         runCatching { priceSources.loadOwned() }
         runCatching { history.record() }
+        if (network.isOnline()) runCatching { repo.completePendingWishlist { setId -> sets.isDigital("en", setId) } }
+        runCatching { repo.autoClearReceived(settings.receivedClear.value) }
+        runCatching { wishWatch.check(online = network.isOnline()) }
     }
 
     /** Looks up every saved card's Cardmarket link again against a fresh card list. */

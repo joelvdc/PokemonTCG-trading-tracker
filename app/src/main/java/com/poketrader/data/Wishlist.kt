@@ -47,34 +47,60 @@ data class WishlistItem(
     @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
 ) {
     val isPending get() = PendingCard.isPending(card.cardId)
+
+    companion object {
+        /** [receivedFrom] of cards whose copies were added to the collection when they were marked received. */
+        const val ADDED = "added to the collection"
+        /** [receivedFrom] of cards marked received because they were in the collection already. */
+        const val OWNED = "in your collection"
+    }
+}
+
+/** How long received wishlist cards are kept before they're cleared by themselves (Settings). Since 1.20. */
+enum class ReceivedClear(val label: String, val months: Int?) {
+    NEVER("Keep until I clear them", null),
+    M1("After 1 month", 1),
+    M3("After 3 months", 3),
+    M6("After 6 months", 6),
+    M12("After 12 months", 12);
+
+    /** Received before this moment are cleared; null keeps them. */
+    fun cutoff(now: Long): Long? = months?.let { now - it * 30L * 24 * 60 * 60 * 1000 }
+
+    companion object {
+        fun fromKey(key: String?) = entries.firstOrNull { it.name == key } ?: NEVER
+    }
 }
 
 /** The alert level in euros at today's rate (see [WishlistItem.alertCurrency]); null without a level. Since 1.20. */
 val WishlistItem.levelEur: Double? get() = alertBelow?.let { Money.eurOf(it, alertCurrency) }
 
 /**
- * A wishlist card added while offline, known only by its name (from Cardmarket's product list on the
- * phone, so an English name). Its set, picture and prices are filled in from TCGdex once the phone is
- * back online. Since 1.20.
+ * A wishlist card added while offline, picked from Cardmarket's product list on the phone (English
+ * names, with the card's attacks in brackets). It keeps Cardmarket's product, so its price shows
+ * offline; its set, number and picture are filled in from TCGdex once the phone is back online (see
+ * [Repository.completePendingWishlist]). Since 1.20.
  */
 object PendingCard {
     const val ID_PREFIX = "pending:"
 
     fun isPending(cardId: String) = cardId.startsWith(ID_PREFIX)
 
-    fun ref(name: String) = CardRef(
-        cardId = ID_PREFIX + name.lowercase(),
+    /** For Cardmarket's product [idProduct], named e.g. "Pikachu [Thunder Shock]". */
+    fun ref(productName: String, idProduct: Int) = CardRef(
+        cardId = ID_PREFIX + idProduct,
         dataLang = "en",
-        name = name,
+        name = CatalogMatch.baseName(productName),
         setId = "",
-        setName = "",
+        setName = "Details follow when you're online",
         localId = "",
         setOfficial = null,
         rarity = "",
         imageBase = null,
         variantId = "",
-        variantLabel = "",
-        cardmarketId = null,
+        // The attacks tell cards of the same name apart until the details come.
+        variantLabel = CatalogMatch.attacks(productName).joinToString(" · "),
+        cardmarketId = idProduct,
         holoPrice = false,
         fallbackPrice = null,
         firstEdition = false,

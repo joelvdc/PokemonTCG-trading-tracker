@@ -33,12 +33,16 @@ import com.poketrader.data.BinderChoice
 
 private const val NEW_BINDER = -1L
 
-/** All binders, kept up to date. */
+/** All binders, kept up to date, in the order arranged in "Arrange binders…" (since 1.20; by name until arranged). */
 @Composable
 fun rememberBinders(): List<Binder> {
     val c = LocalContext.current.container
     val binders by remember { c.db.binderDao().observeAll() }.collectAsStateWithLifecycle(emptyList())
-    return binders
+    val order by c.settings.binderOrder.collectAsStateWithLifecycle()
+    return remember(binders, order) {
+        val place = com.poketrader.data.BinderOrder.arrange(binders, order).withIndex().associate { (i, k) -> k to i }
+        binders.sortedBy { place[com.poketrader.data.BinderOrder.key(it)] ?: Int.MAX_VALUE }
+    }
 }
 
 fun binderName(id: Long, binders: List<Binder>): String =

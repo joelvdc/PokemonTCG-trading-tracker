@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -118,6 +119,14 @@ object Fmt {
     fun money(v: Double?): String = if (v == null) "—" else Money.format(v)
     fun signedMoney(v: Double): String = (if (v > 0.004) "+" else if (v < -0.004) "−" else "") + Money.format(abs(v))
     fun date(ms: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(ms))
+
+    /** "Oct 20" this year, else the full date. Since 1.20. */
+    fun shortDate(ms: Long, now: Long = System.currentTimeMillis()): String {
+        val year = { t: Long -> java.util.Calendar.getInstance().apply { timeInMillis = t }.get(java.util.Calendar.YEAR) }
+        if (year(ms) != year(now)) return date(ms)
+        val locale = Locale.getDefault()
+        return java.text.SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).format(Date(ms))
+    }
     fun dateTime(ms: Long): String = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ms))
 
     /** Parses "3,50" or "3.50"; null for blank/invalid. */
@@ -408,10 +417,20 @@ fun CardTile(
     footnote: String? = null,
     footnoteIsWarning: Boolean = false,
     trend: PriceTrend? = null,
+    /** Picked while selecting cards; a long press starts selecting (since 1.20). */
+    picked: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    /** A second line under the footnote, e.g. a wishlist card's alert (since 1.20). */
+    note: String? = null,
     onClick: () -> Unit,
 ) {
-    Column(modifier.clickable(onClick = onClick).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier.clip(RoundedCornerShape(8.dp)).pickedBackground(picked)
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick).padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Box {
+            if (picked) PickedMark(Modifier.align(Alignment.Center).padding(4.dp))
             CardImage(
                 card.thumbUrl,
                 Modifier.fillMaxWidth(),
@@ -463,6 +482,7 @@ fun CardTile(
                 maxLines = 1,
             )
         }
+        if (note != null) Text(note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
     }
 }
 

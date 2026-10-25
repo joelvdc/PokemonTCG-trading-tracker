@@ -23,6 +23,12 @@ class NetworkMonitor(context: Context) {
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
     }.getOrDefault(false)
 
+    /** Has a connection to the internet right now (as far as Android knows). Since 1.20. */
+    fun isOnline(): Boolean = runCatching {
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }.getOrDefault(true)
+
     init {
         runCatching {
             context.getSystemService(ConnectivityManager::class.java)

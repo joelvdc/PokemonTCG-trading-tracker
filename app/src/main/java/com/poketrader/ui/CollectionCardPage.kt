@@ -124,18 +124,22 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
     )
     val dirty = v != initialFor(current) || selected != item.card
 
+    val joinAsk = rememberJoinCurrencyAsk()
     fun save(after: () -> Unit = {}) {
         val values = v
-        val card = selected
+        val edited = item.copy(
+            card = selected, quantity = values.quantity, condition = values.condition, language = values.language,
+            notes = values.notes?.trim()?.ifEmpty { null }, purchasePrice = values.purchasePrice, purchaseCurrency = values.purchaseCurrency,
+        )
         scope.launch {
-            c.repo.saveCollectionEdit(
-                item.copy(
-                    card = card, quantity = values.quantity, condition = values.condition, language = values.language,
-                    notes = values.notes?.trim()?.ifEmpty { null }, purchasePrice = values.purchasePrice, purchaseCurrency = values.purchaseCurrency,
-                ),
-                values.binderId, values.move,
-            )
-            after()
+            // Joining a stack priced in another currency asks which one to keep (since 1.20).
+            val currencies = c.repo.joinCurrencies(c.repo.editedStacks(edited, values.binderId, values.move))
+            joinAsk.ask(currencies) { into ->
+                scope.launch {
+                    c.repo.saveCollectionEdit(edited, values.binderId, values.move, into)
+                    after()
+                }
+            }
         }
     }
     fun open(other: CollectionRow) {
@@ -333,7 +337,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                     }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = onDismiss) { Text("Cancel") }
-                    TextButton(onClick = { onDismiss(); save() }, enabled = dirty) { Text("Save") }
+                    TextButton(onClick = { save(after = onDismiss) }, enabled = dirty) { Text("Save") }
                 }
             }
         }
@@ -342,6 +346,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
     if (pickingPrinting) {
         PrintingPickerDialog(selected, onPick = { selected = it; pickingPrinting = false }, onDismiss = { pickingPrinting = false })
     }
+    JoinCurrencyDialog(joinAsk)
     switchTo?.let { other ->
         AlertDialog(
             onDismissRequest = { switchTo = null },

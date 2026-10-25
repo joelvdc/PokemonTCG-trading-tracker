@@ -180,3 +180,44 @@ fun MoneyField(
         modifier = modifier,
     )
 }
+
+/**
+ * Asks which currency a stack's purchase price is kept in when cards join it and the two prices are in
+ * different currencies (the owner's choice, 2026-10-25). Since 1.20.
+ */
+@Stable
+class JoinCurrencyAsk {
+    var pending by mutableStateOf<Pair<List<AppCurrency>, (AppCurrency) -> Unit>?>(null)
+
+    /** Runs [then] right away when no choice is needed ([currencies] empty), else once a currency is picked. */
+    fun ask(currencies: List<AppCurrency>, then: (AppCurrency?) -> Unit) {
+        if (currencies.size < 2) then(null) else pending = currencies to { c -> then(c) }
+    }
+}
+
+@Composable
+fun rememberJoinCurrencyAsk(): JoinCurrencyAsk = remember { JoinCurrencyAsk() }
+
+/** The question of a [JoinCurrencyAsk], while one is pending. */
+@Composable
+fun JoinCurrencyDialog(ask: JoinCurrencyAsk) {
+    val (currencies, go) = ask.pending ?: return
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { ask.pending = null },
+        title = { Text("Which currency?") },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                Text(
+                    "These cards join a stack whose purchase price is in another currency. The stack gets the average " +
+                        "paid, converted at today's rate, kept in:",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                currencies.forEach { c ->
+                    TextButton(onClick = { ask.pending = null; go(c) }) { Text(c.label) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = { ask.pending = null }) { Text("Cancel") } },
+    )
+}

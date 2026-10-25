@@ -287,7 +287,7 @@ private fun ToTradeDialog(count: Int, onDismiss: () -> Unit, onConfirm: (tradeId
 }
 
 @Composable
-private fun RadioRow(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun RadioRow(text: String, selected: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
         RadioButton(selected = selected, onClick = onClick)
         Text(text, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)

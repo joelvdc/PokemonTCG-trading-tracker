@@ -74,9 +74,17 @@ class AppContainer(context: Context) {
         tcgdex.missingJapanese = { setId, number -> l.card(setId, number) }
     }
     val history = ValueHistory(db)
+    // Sync between phones through Nextcloud, and restore points (since 1.20).
+    private val syncStore = com.poketrader.data.SyncStore(db, settings)
+    private val nextcloud = com.poketrader.data.NextcloudClient(http)
+    val sync = com.poketrader.data.SyncManager(context, db, syncStore, nextcloud, network, appScope)
+    val backups = com.poketrader.data.Backups(context, syncStore, sync, nextcloud)
+    val wishWatch = com.poketrader.data.WishlistWatch(context, db, settings, tcgdex, priceSources)
+    /** A price alert's notification asked to open this wishlist card (since 1.20). */
+    val openWish = MutableStateFlow<Long?>(null)
     /** Set by the stats screen; the collection shows these cards when it next appears. Since 1.13. */
     val collectionJump = MutableStateFlow<CollectionJump?>(null)
-    val updater = DataUpdater(context, settings, prices, catalog, repo, network, history, priceSources)
+    val updater = DataUpdater(context, settings, prices, catalog, repo, network, history, priceSources, wishWatch, sets)
 
     init {
         // Prices show in the chosen currency at the latest rate (since 1.15), from the chosen source (since 1.16).
@@ -101,6 +109,9 @@ class AppContainer(context: Context) {
         com.poketrader.data.Pricing.usdPerEuro = usd0
         appScope.launch { exchangeRates.rates.map(usd).dropWhile { it == usd0 }.collect { com.poketrader.data.Pricing.usdPerEuro = it } }
         tcgdex.onCard = { card, lang -> priceSources.fromTcgdex(card, lang) }
+        sync.beforeFirstSync = { backups.before(com.poketrader.data.BackupReason.FIRST_NEXTCLOUD) }
+        repo.beforeCsvImport = { backups.before(com.poketrader.data.BackupReason.CSV_IMPORT) }
+        repo.beforeBatchDelete = { backups.before(com.poketrader.data.BackupReason.BATCH_DELETE) }
     }
 
     /** A trade deleted on its own screen, so the trade list can offer Undo once it's back on screen. */
