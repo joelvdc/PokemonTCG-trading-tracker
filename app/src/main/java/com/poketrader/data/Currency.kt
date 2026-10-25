@@ -80,6 +80,52 @@ object Money {
     /** An amount typed in the display currency, in euros. */
     fun toEur(amount: Double): Double = amount / display.perEuro
 
+    /** The latest exchange rates (for amounts kept in another currency than the one shown). Since 1.20. */
+    var rates by mutableStateOf<ExchangeRates?>(null)
+
+    /**
+     * [amount] in [currency] ("DKK"; null is euros), in euros at today's rate: the display rate when it's
+     * the display currency, so the amount shows back exactly as typed. Null while the rate isn't known.
+     * Since 1.20.
+     */
+    fun eurOf(amount: Double, currency: String?): Double? {
+        val cur = AppCurrency.entries.firstOrNull { it.name == currency } ?: AppCurrency.EUR
+        if (cur == AppCurrency.EUR) return amount
+        if (cur == display.currency) return amount / display.perEuro
+        val rate = rates?.rate(cur) ?: ExchangeRates.FALLBACK.rate(cur) ?: return null
+        return amount / rate
+    }
+
+    /** [eur] in [currency], at the same rates as [eurOf]; null while the rate isn't known. Since 1.20. */
+    fun amountIn(eur: Double, currency: AppCurrency): Double? {
+        if (currency == AppCurrency.EUR) return eur
+        if (currency == display.currency) return eur * display.perEuro
+        val rate = rates?.rate(currency) ?: ExchangeRates.FALLBACK.rate(currency) ?: return null
+        return eur * rate
+    }
+
+    /** [amount] kept in [currency] ("DKK", null = euros), shown in that currency exactly as typed: "300,00 kr.". Since 1.20. */
+    fun formatIn(amount: Double, currency: String?): String {
+        val cur = AppCurrency.entries.firstOrNull { it.name == currency } ?: AppCurrency.EUR
+        val sign = if (amount < 0) "-" else ""
+        return when (cur) {
+            AppCurrency.EUR -> eur2.format(amount)
+            AppCurrency.USD -> "$sign$" + number(abs(amount), 2, Locale.US)
+            AppCurrency.DKK -> sign + number(abs(amount), 2, DANISH) + " kr."
+        }
+    }
+
+    /**
+     * A price kept in its own currency, the way the app shows it: as typed when that's the currency shown,
+     * else converted ("€10.05 (75,00 kr.)"). Since 1.20.
+     */
+    fun kept(amount: Double, currency: String?): String {
+        val cur = AppCurrency.entries.firstOrNull { it.name == currency } ?: AppCurrency.EUR
+        if (cur == display.currency) return formatIn(amount, currency)
+        val eur = eurOf(amount, currency) ?: return formatIn(amount, currency)
+        return "${format(eur)} (${formatIn(amount, currency)})"
+    }
+
     private fun eurFormat(decimals: Int) = NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
         currency = java.util.Currency.getInstance("EUR")
         minimumFractionDigits = decimals

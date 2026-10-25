@@ -519,7 +519,7 @@ class Repository(
 
     private val collectionHeader = listOf(
         "Name", "Set", "Number", "Variant", "Quantity", "Condition", "Language", "Price EUR",
-        "TCGdex ID", "Data language", "Variant ID", "Binder Name", "Purchase price", "Notes",
+        "TCGdex ID", "Data language", "Variant ID", "Binder Name", "Purchase price", "Notes", "Purchase currency",
     )
 
     /**
@@ -539,6 +539,8 @@ class Repository(
                 Csv.row(
                     c.name, c.setName, c.numberLabel, c.variantLabel, i.quantity, i.condition, i.language, price,
                     c.cardId, c.dataLang, c.variantId, binderNames[i.binderId] ?: "", i.purchasePrice, i.notes ?: "",
+                    // Kept as typed (since 1.20); files from before have no such column and are in euros.
+                    if (i.purchasePrice != null) i.purchaseCurrency ?: "EUR" else "",
                 )
             )
         }
@@ -568,10 +570,11 @@ class Repository(
         val iBinder = col("Binder Name")
         val iPaid = col("Purchase price")
         val iNotes = col("Notes")
+        val iPaidCurrency = col("Purchase currency")
 
         data class Line(
             val id: String, val dataLang: String, val qty: Int, val variant: String?, val cond: String?, val language: String?, val binder: String?,
-            val paid: Double? = null, val notes: String? = null,
+            val paid: Double? = null, val notes: String? = null, val paidCurrency: String? = null,
         )
         val lines = rows.drop(1).mapNotNull { r ->
             fun v(i: Int?) = i?.let { r.getOrNull(it)?.trim() }?.takeIf { it.isNotEmpty() }
@@ -579,6 +582,7 @@ class Repository(
             Line(
                 id, v(iLang) ?: "en", v(iQty)?.toIntOrNull() ?: 1, v(iVariant), v(iCond), v(iLanguage), v(iBinder),
                 v(iPaid)?.replace(',', '.')?.toDoubleOrNull(), v(iNotes),
+                v(iPaidCurrency)?.uppercase()?.takeIf { c -> c != "EUR" && AppCurrency.entries.any { it.name == c } },
             )
         }
         val keys = lines.map { it.dataLang to it.id }.distinct()
@@ -606,7 +610,8 @@ class Repository(
                 val added = addToCollection(ref, cond, l.language?.uppercase() ?: if (l.dataLang == "ja") "JA" else "EN", l.qty, binder)
                 // Notes and purchase price fill in what the stack doesn't have yet.
                 if (l.paid != null || l.notes != null) coll.byId(added.itemId)?.let { s ->
-                    coll.update(s.copy(purchasePrice = s.purchasePrice ?: l.paid, notes = s.notes ?: l.notes))
+                    val price = if (s.purchasePrice != null) s.purchasePrice to s.purchaseCurrency else l.paid to l.paidCurrency
+                    coll.update(s.copy(purchasePrice = price.first, purchaseCurrency = price.second, notes = s.notes ?: l.notes))
                 }
                 imported += l.qty
             }
@@ -667,7 +672,7 @@ class Repository(
         // Trades are identified by when they were started; this format sorts correctly in spreadsheets.
         val df = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT)
         val sb = StringBuilder()
-        sb.appendLine(Csv.row("Trade started", "Partner", "Applied to collection", "Side", "Name", "Set", "Number", "Variant", "Condition", "Language", "Quantity", "Unit price EUR (${type.short})", "Custom price", "Line total EUR", "TCGdex ID"))
+        sb.appendLine(Csv.row("Trade started", "Partner", "Applied to collection", "Side", "Name", "Set", "Number", "Variant", "Condition", "Language", "Quantity", "Unit price EUR (${type.short})", "Custom price", "Line total EUR", "TCGdex ID", "Custom price currency"))
         for (t in trades.all()) {
             for (i in t.items) {
                 sb.appendLine(
@@ -676,6 +681,7 @@ class Repository(
                         if (i.side == Side.GET) "received" else "given", i.card.name, i.card.setName, i.card.numberLabel,
                         i.card.variantLabel, i.condition, i.language, i.quantity,
                         i.unitPrice(type), i.customPrice, i.lineTotal(type), i.card.cardId,
+                        if (i.customPrice != null) i.customCurrency ?: "EUR" else "",
                     )
                 )
             }

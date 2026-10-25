@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -155,6 +156,8 @@ class ScanController(
     var pending by mutableStateOf<PendingScan?>(null)
     var choose by mutableStateOf<ScanResult.Choose?>(null)
     val added = mutableStateListOf<ScannedEntry>()
+    /** Counts cards put on top of [added], so the list can jump to the newest one. */
+    var additions by mutableStateOf(0)
     var onAdded: () -> Unit = {}
 
     private var busy = false
@@ -238,6 +241,7 @@ class ScanController(
         val hasJumbo = printings.any { it.oversized }
         val result = c.repo.add(target, ref, lang, hasJumbo = hasJumbo) ?: return
         added.add(0, ScannedEntry(ref, lang, result, c.repo.snapshot(ref), hasJumbo = hasJumbo, autoShine = shine?.takeIf { it != Shine.NORMAL }))
+        additions++
         pending = null
         status = "Added ${card.name}!"
         onAdded()
@@ -247,6 +251,7 @@ class ScanController(
     fun addAgain(e: ScannedEntry) = scope.launch {
         val result = c.repo.add(target, e.card, e.language, 1, e.condition, e.hasJumbo) ?: return@launch
         added.add(0, e.copy(result = result))
+        additions++
         onAdded()
     }
 
@@ -386,8 +391,11 @@ fun ScannerScreen(nav: NavController, target: CardTarget) {
                     }
                 }
             }
+            val listState = rememberLazyListState()
+            LaunchedEffect(controller.additions) { if (controller.additions > 0) listState.animateScrollToItem(0) }
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {

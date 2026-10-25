@@ -196,7 +196,7 @@ object CollectionStats {
             entry("$y-${m + 1}", label, addedBy[y to m].orEmpty())
         }
 
-        val paidRows = rows.filter { it.item.purchasePrice != null }
+        val paidRows = rows.filter { it.item.purchaseEur != null }
         return CollectionStatsResult(
             copies = rows.sumOf { it.item.quantity },
             uniqueNames = rows.map { it.item.card.name.lowercase() }.toSet().size,
@@ -204,7 +204,7 @@ object CollectionStats {
             value = rows.sumOf(::value),
             unpriced = rows.filter { it.unitPrice(priceType) == null }.sumOf { it.item.quantity },
             paidCopies = paidRows.sumOf { it.item.quantity },
-            paid = paidRows.sumOf { it.item.purchasePrice!! * it.item.quantity },
+            paid = paidRows.sumOf { it.item.purchaseEur!! * it.item.quantity },
             paidNowWorth = paidRows.sumOf(::value),
             rarities = rarities,
             completion = completion,

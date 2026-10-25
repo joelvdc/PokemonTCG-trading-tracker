@@ -7,6 +7,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -25,6 +26,7 @@ enum class PriceType(val key: String, val label: String, val short: String) {
 }
 
 /** One set of Cardmarket price-guide numbers, in EUR. */
+@Serializable
 data class PriceSet(
     val trend: Double? = null,
     val avg: Double? = null,
@@ -106,6 +108,7 @@ data class PriceEntity(
  * 1st Edition…). International (English/European) cards use TCGdex's English data;
  * Japanese cards are separate sets with their own ids and Cardmarket products.
  */
+@Serializable
 data class CardRef(
     val cardId: String,
     /** "en" for international prints, "ja" for Japanese prints. */
@@ -146,8 +149,10 @@ data class CardRef(
     indices = [
         Index(value = ["cardId", "dataLang", "variantId", "condition", "language", "binderId"], unique = true),
         Index("name"),
+        Index("uid"),
     ],
 )
+@Serializable
 data class CollectionItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @Embedded val card: CardRef,
@@ -159,16 +164,28 @@ data class CollectionItem(
     @ColumnInfo(defaultValue = "0") val binderId: Long = Binder.UNSORTED,
     /** Free text about the copies, e.g. "slightly bent corner". Since 1.9. */
     val notes: String? = null,
-    /** What one copy cost, in EUR, when known. Since 1.9. */
+    /** What one copy cost, in [purchaseCurrency] (as typed), when known. Since 1.9 (always in EUR until 1.19). */
     val purchasePrice: Double? = null,
+    /** The currency [purchasePrice] was typed in ("DKK"); null for euros. Since 1.20. */
+    val purchaseCurrency: String? = null,
+    /** Sync identity and last change; filled in by database triggers (see [SyncSchema]). Since 1.20. */
+    val uid: String? = null,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
 )
 
+/** What one copy cost, in euros at today's rate; null without a purchase price (or while the rate isn't known). Since 1.20. */
+val CollectionItem.purchaseEur: Double? get() = purchasePrice?.let { Money.eurOf(it, purchaseCurrency) }
+
 /** A named group of cards in the collection, like a real binder. Since version 1.5. */
+@Serializable
 @Entity(tableName = "binders")
 data class Binder(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val createdAt: Long = System.currentTimeMillis(),
+    /** Sync identity and last change; filled in by database triggers (see [SyncSchema]). Since 1.20. */
+    val uid: String? = null,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
 ) {
     companion object {
         /** Cards that aren't in any binder. */
@@ -181,6 +198,7 @@ data class Binder(
 data class BinderChoice(val binderId: Long = Binder.UNSORTED, val newName: String? = null)
 
 /** A scanned card waiting in the Scan tab until it's sent to a binder or trade, or discarded. Since 1.5. */
+@Serializable
 @Entity(tableName = "scans")
 data class ScannedCard(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -191,6 +209,9 @@ data class ScannedCard(
     /** The card also exists as a jumbo print; the camera can't tell the size, so the list offers a check. */
     val hasJumbo: Boolean = false,
     val scannedAt: Long = System.currentTimeMillis(),
+    /** Sync identity and last change; filled in by database triggers (see [SyncSchema]). Since 1.20. */
+    val uid: String? = null,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
 )
 
 /** Scanned card joined with today's price guide entry. */
@@ -225,8 +246,22 @@ data class CollectionRow(
 
     /** Cardmarket's trend arrow; none while another price source is chosen (since 1.16). */
     val trend: PriceTrend? get() = if (Pricing.source == PriceSource.CARDMARKET) price?.toSet(item.card.holoPrice)?.trendChange else null
+
+    /** One copy's change lately: Cardmarket's trend against its 30-day average, whatever the price source. Since 1.20. */
+    val change: PriceChange? get() = price?.toSet(item.card.holoPrice)?.let { PriceChange.of(it.trend, it.avg30) }
 }
 
+/** One copy's price change, in EUR and in percent. Since 1.20. */
+data class PriceChange(val money: Double, val pct: Double) {
+    companion object {
+        fun of(trend: Double?, avg30: Double?): PriceChange? {
+            if (trend == null || avg30 == null || avg30 <= 0) return null
+            return PriceChange(trend - avg30, (trend - avg30) / avg30 * 100)
+        }
+    }
+}
+
+@Serializable
 @Entity(tableName = "trades")
 data class Trade(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -237,6 +272,9 @@ data class Trade(
     val appliedAt: Long? = null,
     /** The binder the cards you got went into when the trade was applied. Since version 1.5. */
     @ColumnInfo(defaultValue = "0") val binderId: Long = Binder.UNSORTED,
+    /** Sync identity and last change (also bumped when one of its cards changes); see [SyncSchema]. Since 1.20. */
+    val uid: String? = null,
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
 )
 
 object Side {
@@ -247,6 +285,7 @@ object Side {
     const val GIVE = "GIVE"
 }
 
+@Serializable
 @Entity(
     tableName = "trade_items",
     foreignKeys = [ForeignKey(entity = Trade::class, parentColumns = ["id"], childColumns = ["tradeId"], onDelete = ForeignKey.CASCADE)],
@@ -262,15 +301,20 @@ data class TradeItem(
     val quantity: Int = 1,
     /** Price guide values captured when the card was added (or last refreshed). */
     @Embedded(prefix = "p_") val prices: PriceSet = PriceSet(),
-    /** Optional manually agreed price per copy, overriding the price guide. */
+    /** Optional manually agreed price per copy, in [customCurrency] (as typed), overriding the price guide. */
     val customPrice: Double? = null,
     /** How many copies were actually added (+) / removed (−) from the collection when the trade was applied. */
     val appliedDelta: Int = 0,
     val addedAt: Long = System.currentTimeMillis(),
     /** For given cards: the binder they were (mostly) taken from, so undoing puts them back there. Since 1.5. */
     @ColumnInfo(defaultValue = "0") val appliedBinderId: Long = Binder.UNSORTED,
+    /** The currency [customPrice] was typed in ("DKK"); null for euros. Since 1.20. */
+    val customCurrency: String? = null,
 ) {
-    fun unitPrice(type: PriceType): Double? = customPrice ?: Pricing.unit(card, prices.best(type) ?: card.fallbackPrice)
+    /** The agreed price in euros at today's rate. Since 1.20. */
+    val customEur: Double? get() = customPrice?.let { Money.eurOf(it, customCurrency) }
+
+    fun unitPrice(type: PriceType): Double? = customEur ?: Pricing.unit(card, prices.best(type) ?: card.fallbackPrice)
     fun lineTotal(type: PriceType): Double = (unitPrice(type) ?: 0.0) * quantity
 }
 

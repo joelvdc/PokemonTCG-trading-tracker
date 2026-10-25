@@ -58,6 +58,11 @@ class Settings(context: Context) {
         prefs.edit().putString("currency", c.name).apply()
     }
 
+    /** The currency last chosen in a price field (see [com.poketrader.ui.TypedCurrency]); kept per phone. Since 1.20. */
+    var typedCurrency: String?
+        get() = prefs.getString("typedCurrency", null)
+        set(v) = prefs.edit().putString("typedCurrency", v).apply()
+
     private val _tolerance = MutableStateFlow(prefs.getInt("tolerancePct", 5))
     val tolerancePct: StateFlow<Int> = _tolerance
 

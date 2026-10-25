@@ -405,7 +405,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
     editing?.let { item ->
         CardDialog(
             card = item.card,
-            initial = EditValues(item.quantity, item.condition, item.language, item.customPrice),
+            initial = EditValues(item.quantity, item.condition, item.language, item.customPrice, customCurrency = item.customCurrency),
             priceType = priceType,
             confirmLabel = "Save",
             allowCustomPrice = true,
@@ -415,7 +415,7 @@ fun TradeEditorScreen(nav: NavController, tradeId: Long) {
                 editing = null
                 scope.launch {
                     c.repo.updateTradeItem(
-                        item.copy(card = card, quantity = v.quantity, condition = v.condition, language = v.language, customPrice = v.customPrice)
+                        item.copy(card = card, quantity = v.quantity, condition = v.condition, language = v.language, customPrice = v.customPrice, customCurrency = v.customCurrency)
                     )
                 }
             },

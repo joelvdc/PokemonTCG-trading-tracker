@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import com.poketrader.data.CONDITIONS
 import com.poketrader.data.CollectionFilter
 import com.poketrader.data.Money
+import com.poketrader.data.PriceSource
+import com.poketrader.data.Pricing
 import com.poketrader.data.PrintFilter
 import com.poketrader.data.SortField
 import com.poketrader.data.SortLevel
@@ -53,6 +55,8 @@ private val PRESETS = listOf(
     "Rarest, then name" to SortSpec(listOf(SortLevel(SortField.RARITY), SortLevel(SortField.NAME))),
     "Most valuable" to SortSpec(listOf(SortLevel(SortField.VALUE))),
     "Newest" to SortSpec(listOf(SortLevel(SortField.RECENT))),
+    "Rising lately" to SortSpec(listOf(SortLevel(SortField.CHANGE_PCT))),
+    "Falling lately" to SortSpec(listOf(SortLevel(SortField.CHANGE_PCT, reversed = true))),
 )
 
 /** Sorting in layers ("Rarity, then Name"), each with its own direction. Since 1.11. */
@@ -60,6 +64,7 @@ private val PRESETS = listOf(
 @Composable
 fun SortDialog(initial: SortSpec, onDismiss: () -> Unit, onSave: (SortSpec) -> Unit) {
     var levels by remember { mutableStateOf(initial.levels) }
+    val otherSource = Pricing.source.takeIf { it != PriceSource.CARDMARKET }?.label
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Sort") },
@@ -94,6 +99,15 @@ fun SortDialog(initial: SortSpec, onDismiss: () -> Unit, onSave: (SortSpec) -> U
                         Spacer(Modifier.width(6.dp))
                         Text("Add a level")
                     }
+                }
+                if (levels.any { it.field.isChange }) {
+                    Text(
+                        "The change is Cardmarket's trend price against its 30-day average, for one copy" +
+                            (if (otherSource != null) " (also while $otherSource is your price source, which has no history)" else "") +
+                            ". Cards without a 30-day average go last.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         },

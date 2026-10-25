@@ -12,6 +12,12 @@ enum class SortField(val label: String, val forward: String, val backward: Strin
     VALUE("Value per card", "Highest first", "Lowest first"),
     RECENT("Date added", "Newest first", "Oldest first"),
     QUANTITY("Copies", "Most first", "Fewest first"),
+    /** One copy's change lately ([CollectionRow.change]), in percent and in money. Since 1.20. */
+    CHANGE_PCT("Change in %", "Biggest rise first", "Biggest fall first"),
+    CHANGE_MONEY("Change in money", "Biggest rise first", "Biggest fall first");
+
+    /** Sorts by the price change, which not every card has. */
+    val isChange get() = this == CHANGE_PCT || this == CHANGE_MONEY
 }
 
 @Serializable
@@ -24,6 +30,7 @@ data class SortSpec(val levels: List<SortLevel> = listOf(SortLevel(SortField.NAM
 
     fun comparator(priceType: PriceType): Comparator<CollectionRow> {
         val parts = levels.map { level ->
+            if (level.field.isChange) return@map changeComparator(level.field, level.reversed)
             val c = fieldComparator(level.field, priceType)
             if (level.reversed) c.reversed() else c
         }
@@ -47,6 +54,14 @@ data class SortSpec(val levels: List<SortLevel> = listOf(SortLevel(SortField.NAM
             SortField.VALUE -> compareByDescending { it.unitPrice(priceType) ?: -1.0 }
             SortField.RECENT -> compareByDescending { it.item.addedAt }
             SortField.QUANTITY -> compareByDescending { it.item.quantity }
+            SortField.CHANGE_PCT, SortField.CHANGE_MONEY -> changeComparator(f, fallersFirst = false)
+        }
+
+        /** Biggest rise (or fall) first; cards without a change go last either way. Since 1.20. */
+        fun changeComparator(f: SortField, fallersFirst: Boolean): Comparator<CollectionRow> {
+            fun value(r: CollectionRow) = r.change?.let { if (f == SortField.CHANGE_PCT) it.pct else it.money }
+            val byChange = if (fallersFirst) compareBy<CollectionRow> { value(it) ?: 0.0 } else compareByDescending { value(it) ?: 0.0 }
+            return compareBy<CollectionRow> { value(it) == null }.then(byChange)
         }
     }
 }

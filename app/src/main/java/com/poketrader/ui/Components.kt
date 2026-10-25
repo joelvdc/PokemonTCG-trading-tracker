@@ -597,6 +597,9 @@ data class EditValues(
     /** Collection only: your notes on the stack and what you paid per card. Since 1.9. */
     val notes: String? = null,
     val purchasePrice: Double? = null,
+    /** The currencies [customPrice] and [purchasePrice] are in ("DKK", null = euros). Since 1.20. */
+    val customCurrency: String? = null,
+    val purchaseCurrency: String? = null,
 )
 
 private data class VariantData(val printings: List<CardRef>, val prices: Map<Int, PriceEntity>)
@@ -630,8 +633,8 @@ fun CardDialog(
     val c = LocalContext.current.container
     var selected by remember { mutableStateOf(card) }
     var v by remember { mutableStateOf(initial) }
-    var paidText by remember { mutableStateOf(Money.input(initial.purchasePrice)) }
-    var customText by remember { mutableStateOf(Money.input(initial.customPrice)) }
+    val paidInput = rememberMoneyInput(initial.purchasePrice, initial.purchaseCurrency)
+    val customInput = rememberMoneyInput(initial.customPrice, initial.customCurrency)
     var pickingPrinting by remember { mutableStateOf(false) }
     // The versions of the card shown: reloaded when another printing (set/number) is picked.
     val data by produceState<VariantData?>(null, selected.cardId, selected.dataLang) {
@@ -734,33 +737,15 @@ fun CardDialog(
                     DropdownSelector("Language", v.language, LANGUAGES.map { it.first }, { l -> LANGUAGES.firstOrNull { it.first == l }?.second ?: l }, { v = v.copy(language = it) }, Modifier.weight(1f), enabled)
                 }
                 if (allowCustomPrice) {
-                    OutlinedTextField(
-                        value = customText,
-                        onValueChange = {
-                            customText = it
-                            v = v.copy(customPrice = Fmt.parseMoneyEur(it))
-                        },
-                        label = { Text("Agreed price per card (optional)") },
-                        singleLine = true,
-                        enabled = enabled,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    MoneyField(customInput, "Agreed price per card (optional)", Modifier.fillMaxWidth(), enabled = enabled) {
+                        v = v.copy(customPrice = customInput.amount, customCurrency = customInput.code)
+                    }
                 }
                 if (showNotes) {
-                    OutlinedTextField(
-                        value = paidText,
-                        onValueChange = {
-                            paidText = it
-                            v = v.copy(purchasePrice = Fmt.parseMoneyEur(it))
-                        },
-                        label = { Text("What you paid per card (optional)") },
-                        singleLine = true,
-                        enabled = enabled,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    val paid = v.purchasePrice
+                    MoneyField(paidInput, "What you paid per card (optional)", Modifier.fillMaxWidth(), enabled = enabled) {
+                        v = v.copy(purchasePrice = paidInput.amount, purchaseCurrency = paidInput.code)
+                    }
+                    val paid = paidInput.eur
                     val now = pricesOf(selected, data?.prices?.get(selected.cardmarketId))?.best(priceType)
                     if (paid != null && paid > 0 && now != null) {
                         val diff = (now - paid) * v.quantity

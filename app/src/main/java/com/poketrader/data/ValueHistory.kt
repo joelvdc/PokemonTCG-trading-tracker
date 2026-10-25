@@ -91,14 +91,12 @@ class ValueHistory(private val db: AppDatabase) {
 
         fun totalValue(rows: List<CollectionRow>, type: PriceType) = rows.sumOf { (it.unitPrice(type) ?: 0.0) * it.item.quantity }
 
-        /** The cards that gained (or lost) the most value lately, in EUR over all copies you own. */
+        /**
+         * The cards that gained (or lost) the most value lately, in EUR per card: one copy's change, however
+         * many you own (since 1.20; before, over all copies). The same change the collection sorts by.
+         */
         fun biggestMoves(rows: List<CollectionRow>, up: Boolean, count: Int = 5): List<PriceMove> =
-            rows.mapNotNull { r ->
-                val p = r.price?.toSet(r.item.card.holoPrice) ?: return@mapNotNull null
-                val trend = p.trend ?: return@mapNotNull null
-                val avg30 = p.avg30?.takeIf { it > 0 } ?: return@mapNotNull null
-                PriceMove(r, (trend - avg30) * r.item.quantity, (trend - avg30) / avg30 * 100)
-            }
+            rows.mapNotNull { r -> r.change?.let { PriceMove(r, it.money, it.pct) } }
                 .filter { if (up) it.change > 0 else it.change < 0 }
                 .sortedBy { if (up) -it.change else it.change }
                 .take(count)

@@ -42,4 +42,39 @@ class MigrationTest {
         }
         db.query("SELECT COUNT(*) FROM wishlist").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
     }
+
+    @Test
+    fun from5to6KeepsMyCardsAndGivesThemSyncIds() {
+        helper.createDatabase(dbName, 5).apply {
+            execSQL(
+                "INSERT INTO collection (id, condition, language, quantity, addedAt, binderId, notes, purchasePrice, cardId, dataLang, name, setId, " +
+                    "setName, localId, setOfficial, rarity, imageBase, variantId, variantLabel, cardmarketId, holoPrice, fallbackPrice, firstEdition) " +
+                    "VALUES (1, 'NM', 'EN', 2, 1, 0, 'mint', 12.5, 'base1-4', 'en', 'Charizard', 'base1', 'Base Set', '4', 102, 'Rare Holo', NULL, " +
+                    "'holo', 'Holo', 273699, 0, 300.0, 0)"
+            )
+            execSQL(
+                "INSERT INTO wishlist (id, quantity, anyVariant, notes, addedAt, ownedAtAdd, cardId, dataLang, name, setId, setName, localId, " +
+                    "setOfficial, rarity, imageBase, variantId, variantLabel, cardmarketId, holoPrice, fallbackPrice, firstEdition) " +
+                    "VALUES (1, 1, 1, NULL, 1, 0, 'base1-2', 'en', 'Blastoise', 'base1', 'Base Set', '2', 102, 'Rare Holo', NULL, " +
+                    "'holo', 'Holo', 273697, 0, 200.0, 0)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(dbName, 6, true, AppDatabase.MIGRATION_5_6)
+        db.query("SELECT name, quantity, purchasePrice, purchaseCurrency, uid, updatedAt FROM collection").use { c ->
+            c.moveToFirst()
+            assertEquals("Charizard", c.getString(0))
+            assertEquals(2, c.getInt(1))
+            assertEquals(12.5, c.getDouble(2), 0.0)
+            assertTrue(c.isNull(3))
+            assertEquals(32, c.getString(4).length)
+            assertTrue(c.getLong(5) > 0)
+        }
+        db.query("SELECT name, receivedAt, orderedAt, uid FROM wishlist").use { c ->
+            c.moveToFirst()
+            assertEquals("Blastoise", c.getString(0))
+            assertTrue(c.isNull(1) && c.isNull(2))
+            assertEquals(32, c.getString(3).length)
+        }
+    }
 }

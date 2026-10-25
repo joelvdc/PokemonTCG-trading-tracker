@@ -84,6 +84,10 @@ class AppContainer(context: Context) {
         val display = { cur: com.poketrader.data.AppCurrency, rates: com.poketrader.data.ExchangeRates? -> com.poketrader.data.DisplayCurrency.of(cur, rates) }
         val display0 = display(settings.currency.value, exchangeRates.rates.value)
         com.poketrader.data.Money.display = display0
+        com.poketrader.data.Money.rates = exchangeRates.rates.value
+        com.poketrader.ui.TypedCurrency.last = com.poketrader.data.AppCurrency.entries.firstOrNull { it.name == settings.typedCurrency }
+        com.poketrader.ui.TypedCurrency.save = { settings.typedCurrency = it.name }
+        appScope.launch { exchangeRates.rates.collect { com.poketrader.data.Money.rates = it } }
         appScope.launch {
             kotlinx.coroutines.flow.combine(settings.currency, exchangeRates.rates, display)
                 .dropWhile { it == display0 }

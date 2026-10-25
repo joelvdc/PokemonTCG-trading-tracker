@@ -96,10 +96,10 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
     var currentId by remember { mutableLongStateOf(row.item.id) }
     val current = rows.firstOrNull { it.item.id == currentId } ?: row.takeIf { it.item.id == currentId } ?: rows.firstOrNull() ?: row
     val item = current.item
-    fun initialFor(r: CollectionRow) = r.item.let { EditValues(it.quantity, it.condition, it.language, null, it.binderId, it.quantity, it.notes, it.purchasePrice) }
+    fun initialFor(r: CollectionRow) = r.item.let { EditValues(it.quantity, it.condition, it.language, null, it.binderId, it.quantity, it.notes, it.purchasePrice, purchaseCurrency = it.purchaseCurrency) }
     var v by remember(item.id) { mutableStateOf(initialFor(current)) }
     var selected by remember(item.id) { mutableStateOf(item.card) }
-    var paidText by remember(item.id) { mutableStateOf(Money.input(item.purchasePrice)) }
+    val paidInput = rememberMoneyInput(item.purchasePrice, item.purchaseCurrency, item.id)
     var pricesOpen by remember { mutableStateOf(false) }
     var pickingPrinting by remember { mutableStateOf(false) }
     var switchTo by remember { mutableStateOf<CollectionRow?>(null) }
@@ -131,7 +131,7 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
             c.repo.saveCollectionEdit(
                 item.copy(
                     card = card, quantity = values.quantity, condition = values.condition, language = values.language,
-                    notes = values.notes?.trim()?.ifEmpty { null }, purchasePrice = values.purchasePrice,
+                    notes = values.notes?.trim()?.ifEmpty { null }, purchasePrice = values.purchasePrice, purchaseCurrency = values.purchaseCurrency,
                 ),
                 values.binderId, values.move,
             )
@@ -248,15 +248,23 @@ fun CollectionCardDialog(row: CollectionRow, nav: NavController, snackbar: Snack
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CompactTextField(
-                            "Paid per card", paidText, {
-                                paidText = it
-                                v = v.copy(purchasePrice = Fmt.parseMoneyEur(it))
+                            "Paid per card", paidInput.text, {
+                                paidInput.text = it
+                                v = v.copy(purchasePrice = paidInput.amount, purchaseCurrency = paidInput.code)
                             },
-                            Modifier.weight(0.38f), placeholder = Money.symbol, keyboardType = KeyboardType.Decimal,
-                        )
+                            Modifier.weight(0.38f), placeholder = "0.00", keyboardType = KeyboardType.Decimal,
+                            note = convertedHint(paidInput),
+                        ) {
+                            // The currency it was paid in, kept with the price (since 1.20).
+                            CurrencyButton(paidInput.currency) { cur ->
+                                paidInput.switchTo(cur)
+                                TypedCurrency.pick(cur)
+                                v = v.copy(purchasePrice = paidInput.amount, purchaseCurrency = paidInput.code)
+                            }
+                        }
                         CompactTextField("Notes", v.notes ?: "", { v = v.copy(notes = it.ifBlank { null }) }, Modifier.weight(0.62f), placeholder = "Where from, condition…", singleLine = false)
                     }
-                    val paid = v.purchasePrice
+                    val paid = paidInput.eur
                     if (paid != null && paid > 0 && now != null) {
                         val diff = (now - paid) * v.quantity
                         Text(
@@ -441,20 +449,30 @@ private fun CompactTextField(
     placeholder: String = "",
     keyboardType: KeyboardType = KeyboardType.Text,
     singleLine: Boolean = true,
+    /** A small line under the text, e.g. what a price in another currency comes to (since 1.20). */
+    note: String? = null,
+    /** Something at the end of the field, e.g. the currency button (since 1.20). */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     CompactBox(label, modifier) {
-        Box {
-            if (value.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline, maxLines = 1)
-            BasicTextField(
-                value = value,
-                onValueChange = onChange,
-                singleLine = singleLine,
-                maxLines = if (singleLine) 1 else 4,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
-            )
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    if (value.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline, maxLines = 1)
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onChange,
+                        singleLine = singleLine,
+                        maxLines = if (singleLine) 1 else 4,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                        modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                    )
+                }
+                trailing?.invoke()
+            }
+            note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

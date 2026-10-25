@@ -239,8 +239,9 @@ interface ScanDao {
     entities = [
         PriceEntity::class, CollectionItem::class, Trade::class, TradeItem::class, Binder::class, ScannedCard::class,
         CmProduct::class, CmSetExpansion::class, WishlistItem::class, ValueSnapshot::class, SourcePrice::class,
+        SyncDeletion::class, SyncControl::class, WishAlert::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -253,12 +254,37 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun wishlistDao(): WishlistDao
     abstract fun valueHistoryDao(): ValueHistoryDao
     abstract fun sourcePriceDao(): SourcePriceDao
+    abstract fun syncDao(): SyncDao
+    abstract fun wishAlertDao(): WishAlertDao
 
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "poketrader.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addCallback(object : Callback() {
+                    override fun onOpen(db: SupportSQLiteDatabase) = SyncSchema.install(db)
+                })
                 .build()
+
+        /**
+         * Version 6 (app 1.20): sync ids, change times and deletions for syncing through Nextcloud; prices
+         * kept in the currency they were typed in; the wishlist's ordered and received cards and price alerts.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (t in SyncSchema.UID_TABLES) {
+                    db.execSQL("ALTER TABLE `$t` ADD COLUMN `uid` TEXT")
+                    db.execSQL("ALTER TABLE `$t` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("UPDATE `$t` SET uid = lower(hex(randomblob(16))), updatedAt = ${SyncSchema.NOW}")
+                }
+                db.execSQL("ALTER TABLE `collection` ADD COLUMN `purchaseCurrency` TEXT")
+                db.execSQL("ALTER TABLE `trade_items` ADD COLUMN `customCurrency` TEXT")
+                for (col in listOf("`orderedAt` INTEGER", "`alertBelow` REAL", "`alertCurrency` TEXT", "`receivedAt` INTEGER", "`receivedFrom` TEXT")) {
+                    db.execSQL("ALTER TABLE `wishlist` ADD COLUMN $col")
+                }
+                V6_TABLES_SQL.forEach(db::execSQL)
+            }
+        }
 
         /** Version 5 (app 1.16): TCGplayer's prices, kept on the phone. */
         val MIGRATION_4_5 = object : Migration(4, 5) {
@@ -298,6 +324,18 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+
+/** New tables and indexes of version 6, exactly as Room creates them (from the exported schema, schemas/…/6.json). */
+private val V6_TABLES_SQL = listOf(
+    "CREATE INDEX IF NOT EXISTS `index_collection_uid` ON `collection` (`uid`)",
+    "CREATE INDEX IF NOT EXISTS `index_wishlist_uid` ON `wishlist` (`uid`)",
+    "CREATE TABLE IF NOT EXISTS `sync_deletions` (`uid` TEXT NOT NULL, `deletedAt` INTEGER NOT NULL, PRIMARY KEY(`uid`))",
+    "CREATE TABLE IF NOT EXISTS `sync_control` (`id` INTEGER NOT NULL, `applying` INTEGER NOT NULL, " +
+        "`changes` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
+    "CREATE TABLE IF NOT EXISTS `wish_alerts` (`wishId` INTEGER NOT NULL, `basis` TEXT NOT NULL, `price` REAL, " +
+        "`variantLabel` TEXT, `variants` TEXT, `variantsAt` INTEGER NOT NULL, `alertedLevel` REAL, `checkedAt` INTEGER NOT NULL, " +
+        "PRIMARY KEY(`wishId`))",
+)
 
 /** New tables of version 4, exactly as Room creates them (from the exported schema, schemas/…/4.json). */
 private val V4_TABLES_SQL = listOf(
