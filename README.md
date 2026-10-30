@@ -196,7 +196,9 @@ reverse holo" set it by hand, as before.
   the cards you have, one card at a time, with a progress bar above the tabs; a failed try waits a few hours before the
   next; and whenever TCGdex sends a card). Settings → **Price source** picks Cardmarket
   or TCGplayer to value your cards (collection total, sorting, filters, trades). TCGplayer has one price per version, for
-  English prints: normal, holo, reverse holo and 1st edition. Stamped, special-pattern, other-print and jumbo versions
+  English prints: normal, holo, reverse holo and 1st edition (1.21 reads the price names TCGdex switched to in
+  October 2026, so old holos have one again; while TCGdex sends none, the app keeps the prices it has). Stamped,
+  special-pattern, other-print and jumbo versions
   and Japanese prints keep Cardmarket's price, shown with "≈". The value screen (with a chart per source from 1.16 on),
   the stats ("Value by price source", "Europe or the US?") and each card's page compare both. Kept on the phone only.
 - **Currency:** prices are in euros (Cardmarket's). Settings → **Currency** shows them in Danish kroner or US dollars

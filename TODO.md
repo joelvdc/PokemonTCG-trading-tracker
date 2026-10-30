@@ -42,6 +42,11 @@ Open questions:
 
 ## Done
 
+### TCGplayer price names (Poké Trader 1.21, released 2026-10-30)
+*From the weekly health check of 2026-10-30*: TCGdex renamed two TCGplayer price kinds ("1st-edition-holofoil",
+"unlimited-holofoil"), so old 1st edition and unlimited holos had no TCGplayer price. 1.21 reads the new and old names.
+The same day TCGdex sent no TCGplayer prices at all; the health check now warns when that happens.
+
 ### Features brought over from MTG Trader (Poké Trader 1.20, released 2026-10-26)
 *Asked for on 2026-10-25* ("can you list me potential functionalities that could be ported from the mtg app to the
 pokemon app? … I am not interested in decks or life tracker"); green light for the list and the plan the same day.

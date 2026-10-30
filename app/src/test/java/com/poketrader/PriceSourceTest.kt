@@ -64,6 +64,18 @@ class PriceSourceTest {
         assertEquals("unlimited", versions.single { it.variantId == prices.keys.single() }.subtype)
     }
 
+    @Test
+    fun readsTcgdexsHyphenatedKinds() {
+        // 1.21: Neo Genesis Ampharos with the kinds TCGdex sends since October 2026 ("1st-edition-holofoil", "unlimited-holofoil").
+        val neo = card("neo1-1")
+        val prices = tcgplayerPrices(neo)
+        val first = neo.tcgdexLinks().map { it.first }.single { "1st-edition" in it.stamp }
+        assertEquals(2, prices.size)
+        assertEquals(64.5, prices.getValue(first.variantId).price!!, 1e-9)
+        assertEquals(18.25, prices.filterKeys { it != first.variantId }.values.single().price!!, 1e-9)
+        assertEquals("https://www.tcgplayer.com/product/83534", prices.getValue(first.variantId).url)
+    }
+
     private fun ref(id: String, variant: String = "normal", lang: String = "en", cardmarket: Double = 1.0) =
         CardRef(id, lang, "Card $id", "sv01", "Scarlet & Violet", "1", 198, "Common", null, variant, "Normal", null, false, cardmarket, false)
 

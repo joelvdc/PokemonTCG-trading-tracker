@@ -99,7 +99,11 @@ fun tcgplayerPrices(card: TcgCard): Map<String, SourcePrice> {
     }.toMap()
 }
 
-/** TCGplayer's price keys for a TCGdex variant, most likely first; null when it has no certain match. */
+/**
+ * TCGplayer's price keys for a TCGdex variant, most likely first; null when it has no certain match.
+ * Since 1.21 also the hyphenated names TCGdex switched to in October 2026 ("1st-edition-holofoil",
+ * "unlimited-holofoil"; the two normal ones follow the same pattern but weren't seen yet).
+ */
 fun tcgplayerKeys(v: TcgVariant): List<String>? {
     if (v.isOversized || v.foil != null) return null
     if (v.stamp.any { it != "1st-edition" }) return null
@@ -107,8 +111,8 @@ fun tcgplayerKeys(v: TcgVariant): List<String>? {
     val first = "1st-edition" in v.stamp
     return when (v.type) {
         "reverse" -> listOf("reverse-holofoil")
-        "holo" -> if (first) listOf("1stEditionHolofoil") else listOf("holofoil", "unlimitedHolofoil")
-        "normal" -> if (first) listOf("1stEditionNormal") else listOf("normal", "unlimited")
+        "holo" -> if (first) listOf("1st-edition-holofoil", "1stEditionHolofoil") else listOf("holofoil", "unlimited-holofoil", "unlimitedHolofoil")
+        "normal" -> if (first) listOf("1st-edition-normal", "1stEditionNormal") else listOf("normal", "unlimited-normal", "unlimited")
         else -> null
     }
 }
