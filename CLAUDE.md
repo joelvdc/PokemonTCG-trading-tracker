@@ -56,6 +56,8 @@ Published on GitHub (Obtainium installs them on the owner's phones) as `PokeTrad
 If you're working from a brief given by another session (a helper such as Sonnet or Mistral), follow the brief: work
 only in your own copy of the code; don't commit, merge, release, change versions or touch signing. The session that
 delegated does that after reviewing your work.
+- After a green light, Opus may hand jobs to helpers on its own judgment (`/delegate`: Haiku, Sonnet or Mistral, picked
+  per job); the plan lists each job with its helper, so the green light covers that choice.
 
 ## After a release
 The owner clears the conversation after every release. Before the final report, make sure everything worth keeping is
